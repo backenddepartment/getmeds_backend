@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "GetMEDS Chatbot API"
     DEBUG: bool = False
     PORT: int = 8000
+    CHAT_HISTORY_LIMIT: int = 30
 
     class Config:
         env_file = ".env"
