@@ -1,0 +1,465 @@
+{% include 'components/head.html' %}
+<body class="bg-[#F8FAFC] min-h-screen flex flex-col">
+
+<!-- ===== TOP NAV BAR ===== -->
+<header class="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/admin?collection={{ collection }}" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition text-slate-500">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </a>
+            <div class="h-5 w-px bg-slate-200"></div>
+            <nav class="flex items-center text-xs font-semibold text-slate-400 gap-1.5">
+                <a href="/admin" class="hover:text-slate-700 transition">Admin Console</a>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300"></i>
+                <a href="/admin?collection={{ collection }}" class="hover:text-slate-700 transition" id="nav-collection">Collection</a>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300"></i>
+                <span class="text-slate-800 font-bold">New Document</span>
+            </nav>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="header-type-badge" class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-rose-50 text-rose-600 border-rose-100">
+                <i class="fa-solid fa-plus text-[8px] mr-0.5"></i> New
+            </span>
+            <a href="/admin?collection={{ collection }}"
+                class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs font-bold transition flex items-center gap-1.5">
+                Cancel
+            </a>
+            <button onclick="submitCreate()" id="btn-create"
+                class="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#E11D48] to-[#0D99FF] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-plus text-[10px]"></i> Create Document
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- ===== STATUS TOAST ===== -->
+<div id="toast" class="fixed top-16 right-6 z-50 hidden">
+    <div class="flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-xs font-bold border" id="toast-inner"></div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+
+    <!-- Page title -->
+    <div class="mb-6">
+        <h1 class="text-xl font-extrabold text-slate-800" id="page-title">New Document</h1>
+        <p class="text-xs text-slate-400 mt-1" id="page-subtitle">Fill in the fields below to create a new entry.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        <!-- LEFT: Form Fields -->
+        <div class="lg:col-span-3 flex flex-col gap-6">
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6">
+                <div class="flex items-center gap-2 mb-6">
+                    <i class="fa-solid fa-pen-to-square text-slate-400 text-sm"></i>
+                    <h2 class="text-sm font-extrabold text-slate-800">Document Fields</h2>
+                    <span class="text-[9px] text-slate-400 font-semibold ml-auto">Fields marked <span class="text-rose-400">*</span> are required</span>
+                </div>
+                <div id="fields-container" class="flex flex-col gap-5">
+                    <!-- Rendered by JS -->
+                    <div class="animate-pulse flex flex-col gap-4">
+                        <div class="w-20 h-3 skeleton rounded-md"></div>
+                        <div class="w-full h-10 skeleton rounded-xl"></div>
+                        <div class="w-20 h-3 skeleton rounded-md"></div>
+                        <div class="w-full h-10 skeleton rounded-xl"></div>
+                        <div class="w-20 h-3 skeleton rounded-md"></div>
+                        <div class="w-full h-24 skeleton rounded-xl"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Image Upload + Tips -->
+        <div class="lg:col-span-2 flex flex-col gap-5">
+
+            <!-- Image Upload Card -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6" id="image-card">
+                <div class="flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-image text-slate-400 text-sm"></i>
+                    <h3 class="text-sm font-extrabold text-slate-800">Image</h3>
+                    <span class="text-[9px] text-slate-400 ml-auto">Optional — uploaded after creation</span>
+                </div>
+
+                <!-- Upload Zone -->
+                <div id="upload-zone"
+                    class="relative border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-200 group"
+                    onclick="triggerImageInput()"
+                    ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+                    <div class="w-14 h-14 rounded-xl bg-slate-100 group-hover:bg-blue-100 transition flex items-center justify-center">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-blue-500 transition"></i>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs font-bold text-slate-700">Upload Image</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Drag & drop or click to browse</p>
+                        <p class="text-[9px] text-slate-300 mt-1">JPG, PNG, WebP — max 10MB</p>
+                        <p class="text-[9px] text-blue-400 mt-1 font-semibold">Image will upload after document is created</p>
+                    </div>
+                </div>
+
+                <!-- Preview (shown when file selected) -->
+                <div id="image-preview-container" class="hidden mt-3">
+                    <div class="relative rounded-xl overflow-hidden border border-slate-100">
+                        <img id="image-preview" src="" alt="Preview" class="w-full object-cover max-h-48">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-3">
+                            <span class="text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1">
+                                <i class="fa-solid fa-clock text-[8px]"></i> Queued for upload
+                            </span>
+                        </div>
+                    </div>
+                    <button onclick="clearImageSelection()" class="mt-2 text-[10px] text-rose-400 hover:text-rose-600 font-semibold flex items-center gap-1">
+                        <i class="fa-solid fa-xmark text-[9px]"></i> Remove selection
+                    </button>
+                </div>
+
+                <input type="file" id="image-file-input" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
+            </div>
+
+            <!-- Tips Card -->
+            <div class="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl border border-slate-100 p-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-lightbulb text-amber-400 text-sm"></i>
+                    <h3 class="text-sm font-extrabold text-slate-700">Tips</h3>
+                </div>
+                <ul class="flex flex-col gap-2" id="tips-list">
+                    <li class="text-[10px] text-slate-500 flex items-start gap-2">
+                        <i class="fa-solid fa-circle-check text-green-400 mt-0.5 shrink-0"></i>
+                        A unique ID will be auto-generated for this document.
+                    </li>
+                    <li class="text-[10px] text-slate-500 flex items-start gap-2">
+                        <i class="fa-solid fa-circle-check text-green-400 mt-0.5 shrink-0"></i>
+                        Slug fields are auto-created from the name or title.
+                    </li>
+                    <li class="text-[10px] text-slate-500 flex items-start gap-2">
+                        <i class="fa-solid fa-circle-check text-green-400 mt-0.5 shrink-0"></i>
+                        After creation, you can edit and upload an image on the detail page.
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Collection Info Card -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
+                        <i id="collection-icon" class="fa-solid fa-database text-white text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-extrabold text-slate-800" id="collection-label">Collection</p>
+                        <p class="text-[10px] text-slate-400 font-mono" id="collection-type">{{ collection }}</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<script>
+    const COLLECTION = "{{ collection }}";
+    const SANITY_PROJECT_ID = "{{ sanity_project_id }}";
+    const SANITY_DATASET = "{{ sanity_dataset }}";
+
+    const FIELD_SCHEMAS = {
+        product: [
+            { name:'name', label:'Product Name', type:'text', required:true, placeholder:'e.g. Ibuprofen 400 MG / Tablet' },
+            { name:'price', label:'Price (PHP)', type:'number', required:true, placeholder:'e.g. 95.00', step:'0.01' },
+            { name:'availability', label:'Availability', type:'select', options:[{value:'true',label:'In Stock'},{value:'false',label:'Out of Stock'}] },
+            { name:'category', label:'Category', type:'category_select', required:true },
+            { name:'subCategory', label:'Sub-Category', type:'subcategory_select', required:true },
+            { name:'strength', label:'Strength', type:'text', placeholder:'e.g. 400 mg' },
+            { name:'packaging', label:'Packaging Type', type:'text', placeholder:'e.g. Box of 10 Tablets' },
+            { name:'description', label:'Product Description', type:'textarea', placeholder:'Describe product uses or details...' },
+        ],
+        category: [
+            { name:'title', label:'Category Title', type:'text', required:true, placeholder:'e.g. Heart Health' },
+            { name:'subtitle', label:'Subtitle', type:'text', placeholder:'e.g. Cardiovascular Care' },
+            { name:'description', label:'Description', type:'textarea', placeholder:'Detailed category description...' },
+            { name:'icon', label:'Icon Class (FontAwesome)', type:'text', placeholder:'e.g. fa-heart-pulse' },
+            { name:'subCategories', label:'Sub-Categories (comma separated)', type:'text', placeholder:'e.g. Breast Cancer, Ovarian Cancer, Lung Cancer' },
+        ],
+        heroSlide: [
+            { name:'title', label:'Slide Title', type:'text', required:true, placeholder:'e.g. Your Health Deserves the Best' },
+            { name:'subtitle', label:'Subtitle Text', type:'textarea', placeholder:'Slide body text...' },
+            { name:'primaryButtonText', label:'Primary Button Text', type:'text', placeholder:'e.g. Order Medicines' },
+            { name:'primaryButtonLink', label:'Primary Button Link', type:'text', placeholder:'e.g. /order-medicines' },
+            { name:'secondaryButtonText', label:'Secondary Button Text', type:'text', placeholder:'e.g. Our Services' },
+            { name:'secondaryButtonLink', label:'Secondary Button Link', type:'text', placeholder:'e.g. /services' },
+        ],
+        service: [
+            { name:'title', label:'Service Title', type:'text', required:true, placeholder:'e.g. Home Care Support' },
+            { name:'description', label:'Service Description', type:'textarea', placeholder:'Details about this service...' },
+            { name:'icon', label:'FontAwesome Icon Class', type:'text', placeholder:'e.g. fa-truck-medical' },
+            { name:'link', label:'Redirect URL Path', type:'text', placeholder:'e.g. /services' },
+        ],
+        dealOfDay: [
+            { name:'subtitle', label:'Deal Subtitle', type:'text', placeholder:'e.g. 50% Off Special' },
+            { name:'backgroundText', label:'Giant Background Text', type:'text', placeholder:'e.g. IBUPROFEN' },
+            { name:'priceOverride', label:'Price Override (PHP)', type:'number', placeholder:'e.g. 45.00', step:'0.01' },
+        ],
+        categoryBanner: [
+            { name:'title', label:'Banner Title', type:'text', required:true, placeholder:'e.g. SHOP BY CATEGORY' },
+            { name:'subtitle', label:'Banner Subtitle', type:'text', placeholder:'e.g. BEST SELLER' },
+            { name:'buttonText', label:'Button Text', type:'text', placeholder:'e.g. SHOP NOW' },
+            { name:'buttonLink', label:'Button Link', type:'text', placeholder:'e.g. /product-range' },
+        ],
+        team: [
+            { name:'name', label:'Full Name', type:'text', required:true, placeholder:'e.g. Dr. Sarah Jenkins, MD' },
+            { name:'role', label:'Role / Title', type:'text', required:true, placeholder:'e.g. Head Cardiologist' },
+            { name:'bio', label:'Bio / Background', type:'textarea', placeholder:'Brief professional history...' },
+        ],
+        faq: [
+            { name:'question', label:'Question / Title', type:'text', required:true, placeholder:'e.g. Do you support COD?' },
+            { name:'answer', label:'Answer / Content', type:'textarea', required:true, placeholder:'Provide a detailed answer...' },
+            { name:'keywords', label:'Trigger Keywords (comma separated)', type:'text', placeholder:'e.g. cod, cash, delivery' },
+        ],
+        chatSession: [
+            { name:'sessionId', label:'Session ID', type:'text', required:true, placeholder:'e.g. sess_123456789' },
+            { name:'userName', label:'User Name', type:'text', placeholder:'e.g. John Doe' },
+            { name:'lastSubject', label:'Last Subject', type:'text', placeholder:'e.g. Amoxicillin' },
+            { name:'sessionSummary', label:'Session Summary', type:'textarea', placeholder:'Context memory summary...' },
+        ],
+    };
+
+    const COLLECTION_META = {
+        product:       { label:'Products',       icon:'fa-pills' },
+        category:      { label:'Categories',     icon:'fa-tags' },
+        heroSlide:     { label:'Hero Slides',    icon:'fa-images' },
+        service:       { label:'Services',       icon:'fa-stethoscope' },
+        dealOfDay:     { label:'Deals',          icon:'fa-tag' },
+        categoryBanner:{ label:'Banners',        icon:'fa-rectangle-ad' },
+        team:          { label:'Team Members',   icon:'fa-user-doctor' },
+        faq:           { label:'FAQs',           icon:'fa-circle-question' },
+        chatSession:   { label:'Chat Sessions',  icon:'fa-comments' },
+    };
+
+    const IMAGE_COLLECTIONS = ['product','category','heroSlide','team','categoryBanner'];
+
+    let pendingImageFile = null;
+    let adminToken = '';
+
+    // ---- INIT ----
+    window.addEventListener('DOMContentLoaded', () => {
+        const session = localStorage.getItem('getmeds_admin_session');
+        if (session) {
+            try { adminToken = JSON.parse(session).token || 'getmeds-admin-secret-key'; }
+            catch(e) { adminToken = 'getmeds-admin-secret-key'; }
+        } else { adminToken = 'getmeds-admin-secret-key'; }
+
+        const meta = COLLECTION_META[COLLECTION];
+        const label = meta ? meta.label : COLLECTION;
+        const icon = meta ? meta.icon : 'fa-database';
+
+        document.getElementById('nav-collection').textContent = label;
+        document.getElementById('page-title').textContent = `New ${label.slice(0,-1) || label}`;
+        document.getElementById('page-subtitle').textContent = `Create a new ${label.toLowerCase()} entry in GetMEDS.`;
+        document.title = `New ${label.slice(0,-1)} — GetMEDS Console`;
+        document.getElementById('collection-label').textContent = label;
+        document.getElementById('collection-type').textContent = COLLECTION;
+        document.getElementById('collection-icon').className = `fa-solid ${icon} text-white text-sm`;
+
+        // Hide image card for collections without images
+        if (!IMAGE_COLLECTIONS.includes(COLLECTION)) {
+            document.getElementById('image-card').classList.add('hidden');
+        }
+
+        // Render fields
+        renderFields();
+    });
+
+    function escHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    let fetchedCategories = [];
+
+    async function fetchCategoriesAndSetupDropdowns() {
+        try {
+            const res = await fetch(`/api/admin/documents?collection=category&page=1&limit=100`, {
+                headers: { 'X-Admin-Token': adminToken }
+            });
+            if (!res.ok) throw new Error('Failed to fetch categories');
+            const data = await res.json();
+            fetchedCategories = data.documents || [];
+            
+            const catSelect = document.getElementById('product-category-select');
+            if (catSelect) {
+                catSelect.innerHTML = '<option value="">— Select a Category —</option>' + 
+                    fetchedCategories.map(c => `<option value="${c._id}">${escHtml(c.title)}</option>`).join('');
+                    
+                catSelect.addEventListener('change', (e) => {
+                    const catId = e.target.value;
+                    const subSelect = document.getElementById('product-subcategory-select');
+                    if (!subSelect) return;
+                    
+                    if (!catId) {
+                        subSelect.innerHTML = '<option value="">— Select a Category first —</option>';
+                        subSelect.disabled = true;
+                        return;
+                    }
+                    
+                    const selectedCat = fetchedCategories.find(c => c._id === catId);
+                    const subs = selectedCat?.subCategories || [];
+                    
+                    if (subs.length === 0) {
+                        subSelect.innerHTML = '<option value="">— No sub-categories available —</option>';
+                        subSelect.disabled = false;
+                    } else {
+                        subSelect.innerHTML = '<option value="">— Select a Sub-Category —</option>' +
+                            subs.map(s => `<option value="${s}">${escHtml(s)}</option>`).join('');
+                        subSelect.disabled = false;
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Failed to load categories for dropdown:', err);
+            const catSelect = document.getElementById('product-category-select');
+            if (catSelect) catSelect.innerHTML = '<option value="">— Failed to load categories —</option>';
+        }
+    }
+
+    function renderFields() {
+        const fields = FIELD_SCHEMAS[COLLECTION] || [];
+        const container = document.getElementById('fields-container');
+
+        if (fields.length === 0) {
+            container.innerHTML = `<div class="text-center py-8 text-slate-400"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p class="text-xs font-bold">No field schema found for collection: ${COLLECTION}</p></div>`;
+            return;
+        }
+
+        const base = 'w-full border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-700 bg-white transition placeholder-slate-300';
+
+        container.innerHTML = fields.map(f => {
+            const req = f.required ? '<span class="text-rose-400 ml-0.5">*</span>' : '';
+            let input = '';
+
+            if (f.type === 'textarea') {
+                input = `<textarea name="${f.name}" rows="4" ${f.required?'required':''} class="${base} resize-none" placeholder="${f.placeholder||''}"></textarea>`;
+            } else if (f.type === 'select') {
+                const opts = f.options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+                input = `<select name="${f.name}" class="${base}">${opts}</select>`;
+            } else if (f.type === 'category_select') {
+                input = `<select name="${f.name}" id="product-category-select" ${f.required?'required':''} class="${base}"><option value="">— Loading Categories... —</option></select>`;
+            } else if (f.type === 'subcategory_select') {
+                input = `<select name="${f.name}" id="product-subcategory-select" ${f.required?'required':''} class="${base}" disabled><option value="">— Select a Category first —</option></select>`;
+            } else {
+                const stepAttr = f.step ? `step="${f.step}"` : '';
+                input = `<input type="${f.type}" name="${f.name}" ${f.required?'required':''} ${stepAttr} class="${base}" placeholder="${f.placeholder||''}">`;
+            }
+
+            return `<div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">${f.label}${req}</label>
+                ${input}
+            </div>`;
+        }).join('');
+
+        // Setup dynamic categories connection
+        if (COLLECTION === 'product') {
+            fetchCategoriesAndSetupDropdowns();
+        }
+    }
+
+    // ---- SUBMIT ----
+    async function submitCreate() {
+        const btn = document.getElementById('btn-create');
+        const fields = FIELD_SCHEMAS[COLLECTION] || [];
+
+        // Validate required fields
+        let hasErrors = false;
+        fields.filter(f => f.required).forEach(f => {
+            const el = document.querySelector(`[name="${f.name}"]`);
+            if (!el || !el.value.trim()) {
+                el?.classList.add('border-rose-400', 'ring-2', 'ring-rose-100');
+                hasErrors = true;
+            } else {
+                el?.classList.remove('border-rose-400', 'ring-2', 'ring-rose-100');
+            }
+        });
+        if (hasErrors) { showToast('Please fill in all required fields.', 'warning'); return; }
+
+        setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Creating...');
+        GlobalLoader.start();
+
+        // Build payload
+        const payload = {};
+        fields.forEach(f => {
+            const el = document.querySelector(`[name="${f.name}"]`);
+            if (!el) return;
+            if (f.name === 'availability') payload[f.name] = el.value === 'true';
+            else if (f.type === 'number') payload[f.name] = el.value !== '' ? parseFloat(el.value) : null;
+            else if (f.name === 'keywords' || f.name === 'subCategories') payload[f.name] = el.value.split(',').map(k=>k.trim()).filter(Boolean);
+            else if (f.type === 'category_select') payload[f.name] = el.value ? { _type: 'reference', _ref: el.value } : null;
+            else if (el.value.trim() !== '') payload[f.name] = el.value;
+        });
+
+        try {
+            const res = await fetch(`/api/admin/collection/${COLLECTION}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to create document.');
+
+            const newDocId = data.id;
+            GlobalLoader.done();
+            showToast('Document created!', 'success');
+
+            // Upload queued image after creation
+            if (pendingImageFile && IMAGE_COLLECTIONS.includes(COLLECTION)) {
+                setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Uploading image...');
+                GlobalLoader.start();
+                try {
+                    const imgRes = await fetch(`/api/admin/document/${newDocId}/image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': pendingImageFile.type, 'X-Admin-Token': adminToken },
+                        body: pendingImageFile
+                    });
+                    if (imgRes.ok) GlobalLoader.done();
+                    else { GlobalLoader.fail(); showToast('Image upload failed — retry on edit page.', 'warning'); }
+                } catch(e) { GlobalLoader.fail(); showToast('Image upload failed.', 'warning'); }
+            }
+
+            setTimeout(() => window.location.href = `/admin/document/${newDocId}`, 900);
+        } catch(e) {
+            GlobalLoader.fail();
+            showToast(e.message, 'error');
+            setBtn(btn, false);
+        }
+    }
+
+    // ---- IMAGE QUEUE ----
+    function triggerImageInput() { document.getElementById('image-file-input').click(); }
+
+    function handleFileSelected(e) {
+        const file = e.target.files[0];
+        if (file) queueImage(file);
+    }
+    function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('border-blue-400','bg-blue-50/50'); }
+    function handleDragLeave(e) { e.currentTarget.classList.remove('border-blue-400','bg-blue-50/50'); }
+    function handleDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('border-blue-400','bg-blue-50/50');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) queueImage(file);
+    }
+
+    function queueImage(file) {
+        pendingImageFile = file;
+        const url = URL.createObjectURL(file);
+        document.getElementById('upload-zone').classList.add('hidden');
+        document.getElementById('image-preview').src = url;
+        document.getElementById('image-preview-container').classList.remove('hidden');
+    }
+
+    function clearImageSelection() {
+        pendingImageFile = null;
+        document.getElementById('image-file-input').value = '';
+        document.getElementById('upload-zone').classList.remove('hidden');
+        document.getElementById('image-preview-container').classList.add('hidden');
+    }
+
+    // Use global showToast, setBtn and GlobalLoader from head.html
+</script>
+</body>
+</html>

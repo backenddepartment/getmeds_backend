@@ -45,7 +45,25 @@ class ChatbotService:
         name_match = re.search(r"(?:my name is|im|i am|call me|name is) ([\w\s]+)", query)
         if name_match:
             new_user_name = name_match.group(1).strip().title()
-            await sanity_service.mutate_sanity([{ "patch": { "id": session_id, "set": {"userName": new_user_name} } }])
+            from datetime import datetime
+            timestamp = datetime.utcnow().isoformat() + "Z"
+            await sanity_service.mutate_sanity([
+                {
+                    "createIfNotExists": {
+                        "_id": session_id,
+                        "_type": "chatSession",
+                        "sessionId": session_id,
+                        "lastActivity": timestamp,
+                        "messages": []
+                    }
+                },
+                {
+                    "patch": {
+                        "id": session_id,
+                        "set": {"userName": new_user_name}
+                    }
+                }
+            ])
         
         effective_name = new_user_name or current_user_name
         

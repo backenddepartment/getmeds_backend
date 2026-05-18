@@ -5,12 +5,16 @@ from app.core.config import get_settings
 settings = get_settings()
 
 class SanityService:
-    def __init__(self):
-        self.base_url = f"https://{settings.SANITY_PROJECT_ID}.api.sanity.io/v{settings.SANITY_API_VERSION}/data/query/{settings.SANITY_DATASET}"
+    def __init__(self, project_id: str = None, dataset: str = None):
+        pid = project_id or settings.SANITY_PROJECT_ID
+        ds = dataset or settings.SANITY_DATASET
+        self.project_id = pid
+        self.dataset = ds
+        self.base_url = f"https://{pid}.api.sanity.io/v{settings.SANITY_API_VERSION}/data/query/{ds}"
         self.headers = {}
         if settings.SANITY_TOKEN:
             self.headers["Authorization"] = f"Bearer {settings.SANITY_TOKEN}"
-            print(f"DEBUG: Sanity token loaded (starts with {settings.SANITY_TOKEN[:5]}...)")
+            print(f"DEBUG: Sanity token loaded (starts with {settings.SANITY_TOKEN[:5]}...) for dataset '{ds}'")
         else:
             print("WARNING: No Sanity token found in environment!")
 
@@ -21,7 +25,8 @@ class SanityService:
         """
         import json
         params_with_quotes = {k: json.dumps(v) for k, v in (params or {}).items()}
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        timeout = httpx.Timeout(30.0, connect=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(
                 self.base_url,
                 params={"query": groq_query, **params_with_quotes},
@@ -42,7 +47,7 @@ class SanityService:
         """
         Executes mutations (create, update, delete) against the Sanity API.
         """
-        url = f"https://{settings.SANITY_PROJECT_ID}.api.sanity.io/v{settings.SANITY_API_VERSION}/data/mutate/{settings.SANITY_DATASET}"
+        url = f"https://{self.project_id}.api.sanity.io/v{settings.SANITY_API_VERSION}/data/mutate/{self.dataset}"
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
                 url,
@@ -96,6 +101,8 @@ class SanityService:
                     "messages": [message_obj]
                 }
             }]
+            
+        return await self.mutate_sanity(mutations)
             
     async def save_chat_turn(self, session_id: str, user_text: str, ai_text: str, last_subject: str = None):
         """
@@ -270,3 +277,7 @@ class SanityService:
 
 
 sanity_service = SanityService()
+sanity_security_service = SanityService(
+    project_id=settings.SANITY_SECURITY_PROJECT_ID,
+    dataset=settings.SANITY_SECURITY_DATASET
+)

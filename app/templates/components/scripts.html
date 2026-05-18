@@ -1,0 +1,1849 @@
+<script>
+    // ============================================================
+    //  GLOBAL LOADING SYSTEM, TOAST SYSTEM & BUTTON STATES
+    //  (Now loaded globally from components/head.html)
+    // ============================================================
+
+    const getAdminApiUrl = (endpoint) => `/api/admin/${endpoint}`;
+
+    let loadedDocuments = [];
+    let activeFilter = 'product';
+    let activeFormTab = 'product';
+
+    // Seeded metadata for ALL 12 collections from getmeds_database
+    const COLLECTION_META = {
+        product: { label: 'Products', icon: 'fa-pills', badge: 'bg-blue-50 text-blue-600 border-blue-100/50' },
+        category: { label: 'Categories', icon: 'fa-tags', badge: 'bg-teal-50 text-teal-600 border-teal-100/50' },
+        heroSlide: { label: 'Hero Slides', icon: 'fa-images', badge: 'bg-amber-50 text-amber-600 border-amber-100/50' },
+        service: { label: 'Services', icon: 'fa-stethoscope', badge: 'bg-purple-50 text-purple-600 border-purple-100/50' },
+        dealOfDay: { label: 'Deals', icon: 'fa-tag', badge: 'bg-rose-50 text-rose-600 border-rose-100/50' },
+        categoryBanner: { label: 'Banners', icon: 'fa-rectangle-ad', badge: 'bg-indigo-50 text-indigo-600 border-indigo-100/50' },
+        team: { label: 'Team Members', icon: 'fa-user-doctor', badge: 'bg-emerald-50 text-emerald-600 border-emerald-100/50' },
+        faq: { label: 'FAQs', icon: 'fa-circle-question', badge: 'bg-sky-50 text-sky-600 border-sky-100/50' },
+        chatSession: { label: 'Chat Sessions', icon: 'fa-comments', badge: 'bg-slate-50 text-slate-600 border-slate-100/50' },
+    };
+
+    // Per-collection column definitions: key=field name, label=header, type=render hint
+    const TABLE_SCHEMAS = {
+        product:       [{ key:'name', label:'Name' }, { key:'description', label:'Description', truncate:true }, { key:'price', label:'Price', type:'price' }, { key:'availability', label:'Stock', type:'availability' }, { key:'subCategory', label:'Sub-Category' }],
+        category:      [{ key:'title', label:'Title' }, { key:'subtitle', label:'Subtitle', truncate:true }, { key:'subCategories', label:'Sub-Categories', type:'keywords' }],
+        heroSlide:     [{ key:'title', label:'Title' }, { key:'subtitle', label:'Subtitle', truncate:true }, { key:'primaryButtonText', label:'Primary CTA' }],
+        service:       [{ key:'title', label:'Title' }, { key:'description', label:'Description', truncate:true }, { key:'link', label:'Link', truncate:true }],
+        dealOfDay:     [{ key:'subtitle', label:'Subtitle' }, { key:'backgroundText', label:'Background Text' }, { key:'priceOverride', label:'Price Override', type:'price' }],
+        categoryBanner:[{ key:'title', label:'Title' }, { key:'subtitle', label:'Subtitle' }, { key:'buttonText', label:'Button Text' }],
+        team:          [{ key:'name', label:'Full Name' }, { key:'role', label:'Role' }, { key:'bio', label:'Bio', truncate:true }],
+        faq:           [{ key:'question', label:'Question' }, { key:'answer', label:'Answer', truncate:true }, { key:'keywords', label:'Keywords', type:'keywords' }],
+        chatSession:   [{ key:'sessionId', label:'Session ID' }, { key:'userName', label:'User Name' }, { key:'lastSubject', label:'Last Subject' }],
+    };
+
+    // DRY Input Fields specifications for each of the 12 active database collection schemas
+    const FIELD_SCHEMAS = {
+        product: [
+            { name: 'name', label: 'Product Name', type: 'text', required: true, placeholder: 'e.g. Ibuprofen 400 MG / Tablet' },
+            { name: 'price', label: 'Price (PHP)', type: 'number', required: true, placeholder: 'e.g. 95.00', step: '0.01' },
+            { name: 'availability', label: 'Availability', type: 'select', options: [{ value: 'true', label: 'In Stock' }, { value: 'false', label: 'Out of Stock' }] },
+            { name: 'category', label: 'Category', type: 'category_select', required: true },
+            { name: 'subCategory', label: 'Sub-Category', type: 'subcategory_select', required: true },
+            { name: 'strength', label: 'Strength', type: 'text', placeholder: 'e.g. 400 mg' },
+            { name: 'packaging', label: 'Packaging', type: 'text', placeholder: 'e.g. Box of 10 Tablets' },
+            { name: 'description', label: 'Product Description', type: 'textarea', placeholder: 'Provide product uses or details...' }
+        ],
+        category: [
+            { name: 'title', label: 'Category Title', type: 'text', required: true, placeholder: 'e.g. Heart Health' },
+            { name: 'subtitle', label: 'Short description (e.g. Cancer Care)', type: 'text', placeholder: 'e.g. Cardiovascular Care' },
+            { name: 'description', label: 'Detailed Description', type: 'textarea', placeholder: 'Provide category details...' },
+            { name: 'icon', label: 'Icon Class (FontAwesome)', type: 'text', placeholder: 'e.g. fa-heart-pulse' },
+            { name: 'subCategories', label: 'Sub-Categories (comma separated)', type: 'text', placeholder: 'e.g. Breast Cancer, Ovarian Cancer, Lung Cancer' }
+        ],
+        heroSlide: [
+            { name: 'title', label: 'Slide Title', type: 'text', required: true, placeholder: 'e.g. Your Health Deserves the Best' },
+            { name: 'subtitle', label: 'Subtitle Text', type: 'textarea', placeholder: 'Provide slide body...' },
+            { name: 'primaryButtonText', label: 'Primary Button Text', type: 'text', placeholder: 'e.g. Order Medicines' },
+            { name: 'primaryButtonLink', label: 'Primary Button Link', type: 'text', placeholder: 'e.g. /order-medicines' },
+            { name: 'secondaryButtonText', label: 'Secondary Button Text', type: 'text', placeholder: 'e.g. Our Services' },
+            { name: 'secondaryButtonLink', label: 'Secondary Button Link', type: 'text', placeholder: 'e.g. /services' }
+        ],
+        service: [
+            { name: 'title', label: 'Service Title', type: 'text', required: true, placeholder: 'e.g. Home Care Support' },
+            { name: 'description', label: 'Service Description', type: 'textarea', placeholder: 'Provide details about this service...' },
+            { name: 'icon', label: 'FontAwesome Icon Class', type: 'text', placeholder: 'e.g. fa-truck-medical' },
+            { name: 'link', label: 'Redirect URL Path', type: 'text', placeholder: 'e.g. /services' }
+        ],
+        dealOfDay: [
+            { name: 'subtitle', label: 'Deal Subtitle', type: 'text', placeholder: 'e.g. 50% Off Special' },
+            { name: 'backgroundText', label: 'Giant Background Text', type: 'text', placeholder: 'e.g. IBUPROFEN' },
+            { name: 'priceOverride', label: 'Price Override (PHP)', type: 'number', placeholder: 'e.g. 45.00', step: '0.01' }
+        ],
+        categoryBanner: [
+            { name: 'title', label: 'Banner Title', type: 'text', required: true, placeholder: 'e.g. SHOP BY CATEGORY' },
+            { name: 'subtitle', label: 'Banner Subtitle', type: 'text', placeholder: 'e.g. BEST SELLER' },
+            { name: 'buttonText', label: 'Button Text', type: 'text', placeholder: 'e.g. SHOP NOW' },
+            { name: 'buttonLink', label: 'Button Link', type: 'text', placeholder: 'e.g. /product-range' }
+        ],
+        team: [
+            { name: 'name', label: 'Full Name', type: 'text', required: true, placeholder: 'e.g. Dr. Sarah Jenkins, MD' },
+            { name: 'role', label: 'Role / Title', type: 'text', required: true, placeholder: 'e.g. Head Cardiologist' },
+            { name: 'bio', label: 'Bio / Background', type: 'textarea', placeholder: 'Enter brief history...' }
+        ],
+        faq: [
+            { name: 'question', label: 'Question / Title', type: 'text', required: true, placeholder: 'e.g. Do you support COD?' },
+            { name: 'answer', label: 'Answer / Content', type: 'textarea', required: true, placeholder: 'Provide detailed answer...' },
+            { name: 'keywords', label: 'Trigger Keywords (comma separated)', type: 'text', placeholder: 'e.g. cod, cash, delivery' }
+        ],
+        chatSession: [
+            { name: 'sessionId', label: 'Session ID', type: 'text', required: true, placeholder: 'e.g. sess_123456789' },
+            { name: 'userName', label: 'User Name', type: 'text', placeholder: 'e.g. John Doe' },
+            { name: 'lastSubject', label: 'Last Mentioned Subject', type: 'text', placeholder: 'e.g. Amoxicillin' },
+            { name: 'sessionSummary', label: 'Session Summary', type: 'textarea', placeholder: 'Context memory summary...' }
+        ],
+        adminUser: [
+            { name: 'username', label: 'Username', type: 'text', required: true, placeholder: 'e.g. jessica' },
+            { name: 'role', label: 'Role', type: 'text', required: true, placeholder: 'e.g. Administrator' },
+            { name: 'permissions', label: 'Permissions (comma separated)', type: 'text', required: true, placeholder: 'e.g. CMS Mutations, Logs' },
+            { name: 'status', label: 'Status', type: 'select', options: [{ value: 'Active', label: 'Active' }, { value: 'Suspended', label: 'Suspended' }] },
+            { name: 'passcode', label: 'Passcode', type: 'text', required: true, placeholder: 'e.g. GMP-JESSICA-2026' }
+        ],
+        accessPoint: [
+            { name: 'resource', label: 'Resource / Path', type: 'text', required: true, placeholder: 'e.g. /api/admin/security/users' },
+            { name: 'allowed_roles', label: 'Allowed Roles', type: 'text', required: true, placeholder: 'e.g. Administrator, Security Officer' },
+            { name: 'auth_type', label: 'Auth Type', type: 'text', required: true, placeholder: 'e.g. Master Secret or Operator Session' }
+        ]
+    };
+
+    // Seed beautiful mockup photos matching contacts/authors
+    const seededAvatars = [
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=60",
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=60",
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=60",
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=60",
+        "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=100&auto=format&fit=crop&q=60"
+    ];
+
+    function openFormModal() {
+        const modal = document.getElementById('forms-creator-modal');
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.querySelector('.transform').classList.replace('scale-95', 'scale-100');
+
+        // Default select the active sidebar filter if it exists in the forms specs
+        if (activeFilter !== 'all' && FIELD_SCHEMAS[activeFilter]) {
+            activeFormTab = activeFilter;
+        } else {
+            activeFormTab = 'product';
+        }
+
+        renderModalTabs();
+        renderDynamicFormFields(activeFormTab);
+    }
+
+    function closeFormModal() {
+        const modal = document.getElementById('forms-creator-modal');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modal.querySelector('.transform').classList.replace('scale-100', 'scale-95');
+        showAlert('', '');
+    }
+
+    function renderModalTabs() {
+        const container = document.getElementById('modal-tab-container');
+        let html = '';
+
+        Object.keys(FIELD_SCHEMAS).forEach(key => {
+            const meta = COLLECTION_META[key];
+            const isActive = activeFormTab === key;
+
+            html += `
+                <button type="button" onclick="switchFormTab('${key}')" id="tab-btn-${key}" class="flex-grow text-center py-2 rounded text-[10px] font-bold transition duration-300 flex flex-col items-center gap-1 ${isActive
+                    ? 'admin-tab-btn active text-white font-extrabold shadow-md'
+                    : 'admin-tab-btn text-slate-500 hover:bg-slate-200/50'
+                }">
+                    <i class="fa-solid ${meta.icon} text-xs"></i><span>${meta.label}</span>
+                </button>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function switchFormTab(tabId) {
+        activeFormTab = tabId;
+        renderModalTabs();
+        renderDynamicFormFields(tabId);
+        showAlert('', '');
+    }
+
+    function renderDynamicFormFields(type) {
+        const container = document.getElementById('dynamic-fields-container');
+        document.getElementById('dynamic-doc-type').value = type;
+
+        const fields = FIELD_SCHEMAS[type] || [];
+        let html = '';
+
+        fields.forEach(field => {
+            const reqAttr = field.required ? 'required' : '';
+            const stepAttr = field.step ? `step="${field.step}"` : '';
+
+            html += `<div class="flex flex-col gap-1">
+                <label class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wide">${field.label}</label>`;
+
+            if (field.type === 'textarea') {
+                html += `<textarea name="${field.name}" ${reqAttr} rows="3" class="border border-slate-200 focus:border-slate-400 focus:outline-none rounded-md px-3.5 py-2 text-xs bg-white text-slate-700 resize-none" placeholder="${field.placeholder || ''}"></textarea>`;
+            } else if (field.type === 'select') {
+                const optHtml = field.options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+                html += `<select name="${field.name}" class="border border-slate-200 focus:border-slate-400 focus:outline-none rounded-md px-3.5 py-2 text-xs bg-white text-slate-700">${optHtml}</select>`;
+            } else if (field.type === 'category_select') {
+                const opts = (window.cachedCategories || []).map(c => `<option value="${c._id}">${escapeHtml(c.title)}</option>`).join('');
+                html += `<select name="${field.name}" id="modal-product-category-select" class="border border-slate-200 focus:border-slate-400 focus:outline-none rounded-md px-3.5 py-2 text-xs bg-white text-slate-700">
+                    <option value="">— Select a Category —</option>
+                    ${opts}
+                </select>`;
+            } else if (field.type === 'subcategory_select') {
+                html += `<select name="${field.name}" id="modal-product-subcategory-select" class="border border-slate-200 focus:border-slate-400 focus:outline-none rounded-md px-3.5 py-2 text-xs bg-white text-slate-700" disabled>
+                    <option value="">— Select a Category first —</option>
+                </select>`;
+            } else {
+                html += `<input type="${field.type}" name="${field.name}" ${reqAttr} ${stepAttr} class="border border-slate-200 focus:border-slate-400 focus:outline-none rounded-md px-3.5 py-2 text-xs bg-white text-slate-700" placeholder="${field.placeholder || ''}">`;
+            }
+
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
+
+        // Setup dynamic categories connection in the popup modal
+        if (type === 'product') {
+            setTimeout(() => {
+                const catSelect = document.getElementById('modal-product-category-select');
+                if (catSelect) {
+                    catSelect.addEventListener('change', (e) => {
+                        const catId = e.target.value;
+                        const subSelect = document.getElementById('modal-product-subcategory-select');
+                        if (!subSelect) return;
+                        
+                        if (!catId) {
+                            subSelect.innerHTML = '<option value="">— Select a Category first —</option>';
+                            subSelect.disabled = true;
+                            return;
+                        }
+                        
+                        const selectedCat = (window.cachedCategories || []).find(c => c._id === catId);
+                        const subs = selectedCat?.subCategories || [];
+                        
+                        if (subs.length === 0) {
+                            subSelect.innerHTML = '<option value="">— No sub-categories available —</option>';
+                            subSelect.disabled = false;
+                        } else {
+                            subSelect.innerHTML = '<option value="">— Select a Sub-Category —</option>' +
+                                subs.map(s => `<option value="${s}">${escapeHtml(s)}</option>`).join('');
+                            subSelect.disabled = false;
+                        }
+                    });
+                }
+            }, 50);
+        }
+    }
+
+    function showAlert(msg, type) {
+        const alertBox = document.getElementById('form-alert');
+        if (!msg) {
+            alertBox.classList.add('hidden');
+            return;
+        }
+        alertBox.className = `rounded-md p-3 text-[10px] font-semibold flex items-center gap-2 animate-pulse ${type === 'success' ? 'bg-green-500/10 text-success border border-green-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+            }`;
+        alertBox.innerHTML = `
+            <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+            <span>${msg}</span>
+        `;
+        alertBox.classList.remove('hidden');
+    }
+
+    async function submitDynamicForm(event) {
+        event.preventDefault();
+        const form = event.target;
+        const docType = document.getElementById('dynamic-doc-type').value;
+        const token = document.getElementById('admin-secret-token').value;
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalHTML = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Saving to database...';
+
+        const formData = new FormData(form);
+        const payload = {};
+
+        formData.forEach((value, key) => {
+            if (key === '_type') return;
+
+            const schemaDef = FIELD_SCHEMAS[docType].find(f => f.name === key);
+            if (schemaDef) {
+                if (schemaDef.type === 'number') {
+                    payload[key] = parseFloat(value);
+                } else if (schemaDef.name === 'availability') {
+                    payload[key] = value === 'true';
+                } else if (schemaDef.name === 'keywords' || schemaDef.name === 'subCategories') {
+                    payload[key] = value.split(',').map(k => k.trim()).filter(Boolean);
+                } else if (schemaDef.type === 'category_select') {
+                    payload[key] = value ? { _type: 'reference', _ref: value } : null;
+                } else {
+                    payload[key] = value;
+                }
+            } else {
+                payload[key] = value;
+            }
+        });
+
+        try {
+            const res = await fetch(`/api/admin/collection/${docType}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Token': token
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || 'Failed to submit knowledge.');
+            }
+
+            showAlert('Knowledge added successfully!', 'success');
+            form.reset();
+            setTimeout(() => {
+                closeFormModal();
+                refreshAdminDashboard();
+            }, 1000);
+        } catch (err) {
+            showAlert(err.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHTML;
+        }
+    }
+
+    // Global Table Pagination States
+    let currentPage = 1;
+    const pageSize = 5;
+    let totalDocuments = 0;
+
+    async function refreshAdminDashboard() {
+        GlobalLoader.start();
+        renderTableSkeleton();
+        renderHeaderStatsSkeleton();
+        renderSidebarMenu();
+        renderTableHeaders(activeFilter);
+        clearBulkSelection && clearBulkSelection();
+
+        try {
+            try {
+                const catRes = await fetch(getAdminApiUrl(`documents?collection=category&page=1&limit=100`));
+                if (catRes.ok) {
+                    const catData = await catRes.json();
+                    window.cachedCategories = catData.documents || [];
+                }
+            } catch(e) {
+                console.error('Failed to pre-cache categories:', e);
+            }
+
+            const docsRes = await fetch(getAdminApiUrl(`documents?collection=${activeFilter}&page=${currentPage}&limit=${pageSize}`));
+            if (!docsRes.ok) throw new Error('Unreachable or unauthorized.');
+
+            const data = await docsRes.json();
+            loadedDocuments = data.documents || [];
+            totalDocuments = data.total || 0;
+
+            renderHeaderStats(totalDocuments);
+            renderDocuments();
+            renderPagination();
+            GlobalLoader.done();
+        } catch (err) {
+            GlobalLoader.fail();
+            showToast('Failed to load data. Check backend connection.', 'error');
+            console.error('[Admin Panel] Refresh error:', err);
+            const schema = TABLE_SCHEMAS[activeFilter] || [];
+            const colCount = schema.length + 3;
+            const list = document.getElementById('knowledge-feed-list');
+            list.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-12 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation text-lg mb-2"></i><p class="text-[10px]">Verify backend connection or Sanity client token.</p></td></tr>`;
+        }
+    }
+
+    function renderHeaderStats(activeCount) {
+        const container = document.getElementById('header-stats-container');
+        if (!container) return;
+        const meta = COLLECTION_META[activeFilter] || { label: activeFilter };
+        container.innerHTML = `
+            <div class="border-l border-slate-200/80 pl-4">
+                <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-extrabold text-slate-800">${activeCount}</span>
+                    <span class="text-[10px] text-slate-400 font-semibold">Active</span>
+                </div>
+                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">${meta.label}</span>
+            </div>
+        `;
+    }
+
+    function renderSidebarMenu() {
+        const nav = document.getElementById('sidebar-menu-nav');
+        if (!nav) return;
+
+        let html = ``;
+        Object.keys(COLLECTION_META).forEach(key => {
+            const meta = COLLECTION_META[key];
+            const isActive = activeFilter === key;
+
+            html += `
+                <a href="#" onclick="setActiveFilter('${key}')" class="flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold ${isActive
+                    ? 'bg-slate-50 border-r-4 border-slate-900 text-slate-900'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                } transition duration-200">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid ${meta.icon} text-sm"></i>
+                        <span>${meta.label}</span>
+                    </div>
+                </a>
+            `;
+        });
+        nav.innerHTML = html;
+    }
+
+    function setActiveFilter(filterKey) {
+        activeFilter = filterKey;
+        currentPage = 1;
+
+        const meta = COLLECTION_META[filterKey];
+        const titleLabel = meta ? meta.label : 'Products';
+        document.getElementById('breadcrumb-filter-name').innerText = titleLabel;
+        document.getElementById('table-active-title').innerText = titleLabel;
+        document.getElementById('header-hub-title').innerText = meta ? `GetMEDS - ${meta.label}` : 'GetMEDS Active Hub';
+
+        syncUrlToState();
+        refreshAdminDashboard();
+    }
+
+    function renderTableHeaders(collection) {
+        const thead = document.getElementById('table-header-row');
+        if (!thead) return;
+        const schema = TABLE_SCHEMAS[collection] || [];
+        const cols = schema.map(c => `<th class="px-6 py-4">${c.label}</th>`).join('');
+        thead.innerHTML = `<tr class="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100"><th class="px-6 py-4 w-12"><input type="checkbox" id="select-all-checkbox" class="rounded border-slate-300" onchange="toggleSelectAll(this.checked)"></th><th class="px-6 py-4">ID</th>${cols}<th class="px-6 py-4 w-12"></th></tr>`;
+    }
+
+    function renderDocRow(doc) {
+        const schema = TABLE_SCHEMAS[activeFilter] || [];
+        const cells = schema.map(col => {
+            const val = doc[col.key];
+            let display;
+            if (col.type === 'price') {
+                display = (val != null) ? `<span class="font-extrabold text-slate-800">₱${Number(val).toLocaleString()}</span>` : '<span class="text-slate-300">—</span>';
+            } else if (col.type === 'availability') {
+                display = val === true
+                    ? '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-green-50 text-green-600 border-green-100">In Stock</span>'
+                    : '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-rose-50 text-rose-500 border-rose-100">Out of Stock</span>';
+            } else if (col.type === 'keywords') {
+                const kw = Array.isArray(val) ? val.join(', ') : (val ?? '—');
+                display = `<span class="text-slate-500">${escapeHtml(kw)}</span>`;
+            } else {
+                const txt = String(val ?? '—');
+                display = col.truncate
+                    ? `<span class="block truncate max-w-[200px] text-slate-500" title="${escapeHtml(txt)}">${escapeHtml(txt)}</span>`
+                    : `<span class="font-semibold text-slate-700">${escapeHtml(txt)}</span>`;
+            }
+            return `<td class="px-6 py-3.5 text-xs">${display}</td>`;
+        }).join('');
+        return `<tr class="hover:bg-blue-50/30 transition duration-150 cursor-pointer group" data-id="${doc._id}" onclick="openDocumentDetail('${doc._id}')">
+            <td class="px-6 py-3.5" onclick="event.stopPropagation()"><input type="checkbox" class="row-checkbox rounded border-slate-300" data-id="${doc._id}" onchange="toggleRowSelection(this)"></td>
+            <td class="px-6 py-3.5 font-mono text-[10px] font-extrabold text-slate-800">${escapeHtml(doc._id)}</td>
+            ${cells}
+            <td class="px-6 py-3.5" onclick="event.stopPropagation()">
+                <button onclick="deleteKnowledgeDocument('${doc._id}', this)" class="text-slate-300 hover:text-rose-500 rounded-lg w-8 h-8 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                </button>
+            </td>
+        </tr>`;
+    }
+
+    function renderDocuments() {
+        const list = document.getElementById('knowledge-feed-list');
+        const schema = TABLE_SCHEMAS[activeFilter] || [];
+        const colCount = schema.length + 3;
+        if (loadedDocuments.length === 0) {
+            list.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-12 text-slate-400"><i class="fa-solid fa-box-open text-lg mb-2"></i><p class="text-[10px] font-bold">No documents found for this collection.</p></td></tr>`;
+            return;
+        }
+        list.innerHTML = loadedDocuments.map(doc => renderDocRow(doc)).join('');
+    }
+
+    function changePage(page) {
+        if (page < 1 || page > Math.ceil(totalDocuments / pageSize)) return;
+        currentPage = page;
+        syncUrlToState();
+        refreshAdminDashboard();
+    }
+
+    function renderPagination() {
+        const infoSpan = document.getElementById('pagination-info');
+        const pagesDiv = document.getElementById('pagination-pages');
+        if (!infoSpan || !pagesDiv) return;
+
+        if (totalDocuments === 0) {
+            infoSpan.innerText = "Showing 0 to 0 of 0 entries";
+            pagesDiv.innerHTML = "";
+            return;
+        }
+
+        const startIdx = (currentPage - 1) * pageSize + 1;
+        const endIdx = Math.min(currentPage * pageSize, totalDocuments);
+        infoSpan.innerText = `Showing ${startIdx} to ${endIdx} of ${totalDocuments} entries`;
+
+        const totalPages = Math.ceil(totalDocuments / pageSize);
+        let html = ``;
+
+        // Prev Button
+        const prevDisabled = currentPage === 1;
+        html += `
+            <button onclick="changePage(${currentPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] font-extrabold ${prevDisabled ? 'text-slate-300 bg-slate-50/50 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 transition'}">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+        `;
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            const isActive = currentPage === i;
+            html += `
+                <button onclick="changePage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg text-[10px] font-extrabold transition border ${isActive
+                    ? 'bg-gradient-to-tr from-[#0D99FF] to-indigo-600 border-indigo-600 text-white shadow-md shadow-[#0D99FF]/10'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }">
+                    ${i}
+                </button>
+            `;
+        }
+
+        // Next Button
+        const nextDisabled = currentPage === totalPages;
+        html += `
+            <button onclick="changePage(${currentPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] font-extrabold ${nextDisabled ? 'text-slate-300 bg-slate-50/50 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 transition'}">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        `;
+
+        pagesDiv.innerHTML = html;
+    }
+
+    async function deleteKnowledgeDocument(docId, btn) {
+        if (!await customConfirm({
+            title: 'Delete Document',
+            message: 'Are you sure you want to delete this document? This action cannot be undone.',
+            confirmText: 'Yes, Delete'
+        })) return;
+        if (btn) setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-xs text-rose-500"></i>');
+        GlobalLoader.start();
+
+        try {
+            const res = await fetch(getAdminApiUrl(`document/${docId}`), {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) throw new Error('Could not delete document.');
+            GlobalLoader.done();
+            showToast('Document deleted successfully.', 'success');
+            refreshAdminDashboard();
+            if (btn) setBtn(btn, false);
+        } catch (err) {
+            GlobalLoader.fail();
+            showToast(err.message, 'error');
+            if (btn) setBtn(btn, false);
+        }
+    }
+
+    function filterDocuments() {
+        const term = document.getElementById('document-search').value.toLowerCase();
+        const schema = TABLE_SCHEMAS[activeFilter] || [];
+        const colCount = schema.length + 3;
+        const filtered = loadedDocuments.filter(doc => {
+            return Object.values(doc).some(v => String(v ?? '').toLowerCase().includes(term));
+        });
+        const list = document.getElementById('knowledge-feed-list');
+        if (filtered.length === 0) {
+            list.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-12 text-slate-400"><i class="fa-solid fa-box-open text-lg mb-2"></i><p class="text-[10px] font-bold">No matching records found.</p></td></tr>`;
+            return;
+        }
+        list.innerHTML = filtered.map(doc => renderDocRow(doc)).join('');
+    }
+
+    function triggerGlobalSearch() {
+        const term = document.getElementById('sidebar-global-search').value.toLowerCase();
+        document.getElementById('document-search').value = term;
+        filterDocuments();
+    }
+
+    // Shimmering skeleton loading templates for high anticipation
+    function renderTableSkeleton() {
+        const list = document.getElementById('knowledge-feed-list');
+        if (!list) return;
+        const schema = TABLE_SCHEMAS[activeFilter] || [];
+        const extraCols = schema.map(() => `<td class="px-6 py-3.5"><div class="w-28 h-4 skeleton rounded-md"></div></td>`).join('');
+        let html = '';
+        for (let i = 0; i < 5; i++) {
+            html += `<tr class="animate-pulse">
+                <td class="px-6 py-4 w-12"><input type="checkbox" class="rounded border-slate-300 opacity-20" disabled></td>
+                <td class="px-6 py-3.5"><div class="w-24 h-4 skeleton rounded-md"></div></td>
+                ${extraCols}
+                <td class="px-6 py-3.5 w-12"><div class="w-6 h-6 rounded skeleton"></div></td>
+            </tr>`;
+        }
+        list.innerHTML = html;
+    }
+
+    function renderHeaderStatsSkeleton() {
+        const container = document.getElementById('header-stats-container');
+        if (!container) return;
+        let html = '';
+        for (let i = 0; i < 3; i++) {
+            html += `
+                <div class="border-l border-slate-200/80 pl-4 animate-pulse">
+                    <div class="w-10 h-6 skeleton rounded-md mb-1.5"></div>
+                    <div class="w-16 h-3 skeleton rounded-md"></div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    function renderSidebarSkeleton() {
+        const nav = document.getElementById('sidebar-menu-nav');
+        if (!nav) return;
+        let html = '';
+        for (let i = 0; i < 7; i++) {
+            html += `
+                <div class="flex items-center justify-between px-3 py-2.5 rounded-md animate-pulse">
+                    <div class="flex items-center gap-3 w-3/4">
+                        <div class="w-4 h-4 rounded-md skeleton shrink-0"></div>
+                        <div class="h-3.5 skeleton w-20 rounded-md"></div>
+                    </div>
+                    <div class="w-6 h-4 rounded skeleton"></div>
+                </div>
+            `;
+        }
+        nav.innerHTML = html;
+    }
+
+    let loadedSecurityUsers = [];
+    let loadedSecurityLogs = [];
+    let loadedSecurityAccess = [];
+
+    let activeSecurityTab = 'users';
+    let currentSecurityPage = 1;
+    const securityPageSize = 5;
+    let totalSecurityLogs = 0;
+
+    function renderSecurityUsersSkeleton() {
+        const list = document.getElementById('security-users-list');
+        if (!list) return;
+        let html = '';
+        for (let i = 0; i < 4; i++) {
+            html += `
+                <tr class="animate-pulse">
+                    <td class="px-4 py-3.5"><div class="w-24 h-4 skeleton rounded-md"></div></td>
+                    <td class="px-4 py-3.5"><div class="w-20 h-4 skeleton rounded-md"></div></td>
+                    <td class="px-4 py-3.5"><div class="w-48 h-4 skeleton rounded-md"></div></td>
+                    <td class="px-4 py-3.5"><div class="w-16 h-5 rounded-full skeleton"></div></td>
+                    <td class="px-4 py-3.5 w-20"><div class="w-12 h-4 skeleton rounded-md"></div></td>
+                </tr>
+            `;
+        }
+        list.innerHTML = html;
+    }
+
+    function renderSecurityAccessSkeleton() {
+        const list = document.getElementById('security-access-list');
+        if (!list) return;
+        let html = '';
+        for (let i = 0; i < 4; i++) {
+            html += `
+                <tr class="animate-pulse">
+                    <td class="px-4 py-3.5"><div class="w-32 h-4 skeleton rounded-md"></div></td>
+                    <td class="px-4 py-3.5"><div class="w-24 h-4 skeleton rounded-md"></div></td>
+                    <td class="px-4 py-3.5"><div class="w-40 h-4 skeleton rounded-md"></div></td>
+                </tr>
+            `;
+        }
+        list.innerHTML = html;
+    }
+
+    function renderSecurityLogsSkeleton() {
+        const feed = document.getElementById('security-logs-feed');
+        if (!feed) return;
+        let html = '';
+        for (let i = 0; i < 3; i++) {
+            html += `
+                <div class="bg-white border border-slate-100 rounded-lg p-3 shadow-sm flex flex-col gap-1.5 animate-pulse">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5 w-1/2">
+                            <div class="w-10 h-4 rounded-full skeleton"></div>
+                            <div class="w-20 h-4 rounded-md skeleton"></div>
+                        </div>
+                        <div class="w-12 h-3 rounded-md skeleton"></div>
+                    </div>
+                    <div class="w-full h-4 rounded-md skeleton"></div>
+                    <div class="w-1/3 h-3 rounded-md skeleton mt-1"></div>
+                </div>
+            `;
+        }
+        feed.innerHTML = html;
+    }
+
+    function switchSecurityTab(tabName) {
+        activeSecurityTab = tabName;
+        currentSecurityPage = 1; // Reset page on tab switch
+
+        // Remove active style from all sub-tab buttons
+        document.querySelectorAll('.sec-tab-btn').forEach(btn => {
+            btn.classList.remove('active', 'border-primary', 'text-primary');
+            btn.classList.add('border-transparent', 'text-slate-500');
+        });
+
+        // Add active style to selected button
+        const activeBtn = document.getElementById(`sec-tab-btn-${tabName}`);
+        if (activeBtn) {
+            activeBtn.classList.add('active', 'border-primary', 'text-primary');
+            activeBtn.classList.remove('border-transparent', 'text-slate-500');
+        }
+
+        // Hide all sub-panels
+        document.getElementById('sec-panel-users').classList.add('hidden');
+        document.getElementById('sec-panel-policies').classList.add('hidden');
+        document.getElementById('sec-panel-logs').classList.add('hidden');
+
+        // Show active panel
+        document.getElementById(`sec-panel-${tabName}`).classList.remove('hidden');
+
+        // Fetch only the active tab's data
+        refreshSecurityDashboard();
+    }
+
+    function showSecurityControlPanel(skipUrl = false) {
+        activeFilter = 'security';
+        if (!skipUrl) syncUrlToState();
+
+        // Hide the standard database panel
+        document.getElementById('database-hub-panel').classList.add('hidden');
+        // Show security panel
+        document.getElementById('security-control-panel').classList.remove('hidden');
+
+        // Set active class on sidebar security button
+        document.getElementById('sidebar-security-btn').classList.add('text-slate-900', 'bg-slate-50', 'border-r-4', 'border-slate-900');
+        document.getElementById('sidebar-security-btn').classList.remove('text-slate-500');
+
+        // Remove active classes from all database schemas sidebar options
+        document.querySelectorAll('#sidebar-menu-nav a').forEach(a => {
+            a.classList.remove('bg-slate-50', 'border-r-4', 'border-slate-900', 'text-slate-900');
+            a.classList.add('text-slate-500');
+        });
+
+        switchSecurityTab('users');
+    }
+
+    function hideSecurityControlPanel(skipUrl = false) {
+        document.getElementById('security-control-panel').classList.add('hidden');
+        document.getElementById('database-hub-panel').classList.remove('hidden');
+        document.getElementById('sidebar-security-btn').classList.remove('text-slate-900', 'bg-slate-50', 'border-r-4', 'border-slate-900');
+        document.getElementById('sidebar-security-btn').classList.add('text-slate-500');
+
+        // Select default 'product' tab
+        setActiveFilter('product', skipUrl);
+    }
+
+    async function refreshSecurityDashboard() {
+        const token = document.getElementById('admin-secret-token').value;
+        try {
+            if (activeSecurityTab === 'users') {
+                renderSecurityUsersSkeleton();
+                const usersRes = await fetch('/api/admin/security/users', { headers: { 'X-Admin-Token': token } });
+                if (usersRes.ok) {
+                    loadedSecurityUsers = await usersRes.json();
+                    renderSecurityUsers();
+                    updateSecurityStats();
+                }
+            } else if (activeSecurityTab === 'policies') {
+                renderSecurityAccessSkeleton();
+                const accessRes = await fetch('/api/admin/security/access', { headers: { 'X-Admin-Token': token } });
+                if (accessRes.ok) {
+                    loadedSecurityAccess = await accessRes.json();
+                    renderSecurityAccess();
+                    updateSecurityStats();
+                }
+            } else if (activeSecurityTab === 'logs') {
+                renderSecurityLogsSkeleton();
+                const logsRes = await fetch(`/api/admin/security/logs?page=${currentSecurityPage}&limit=${securityPageSize}`, { headers: { 'X-Admin-Token': token } });
+                if (logsRes.ok) {
+                    const data = await logsRes.json();
+                    loadedSecurityLogs = data.logs || [];
+                    totalSecurityLogs = data.total || 0;
+                    renderSecurityLogs();
+                    renderSecurityLogsPagination();
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load security dashboard:', err);
+        }
+    }
+
+    function updateSecurityStats() {
+        const statUsers = document.getElementById('sec-stat-users');
+        const statRules = document.getElementById('sec-stat-rules');
+        if (statUsers && loadedSecurityUsers.length > 0) statUsers.innerText = loadedSecurityUsers.length;
+        if (statRules && loadedSecurityAccess.length > 0) statRules.innerText = loadedSecurityAccess.length;
+    }
+
+    function renderSecurityUsers() {
+        const tbody = document.getElementById('security-users-list');
+        if (!tbody) return;
+
+        if (loadedSecurityUsers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 font-bold">No users configured.</td></tr>';
+        } else {
+            tbody.innerHTML = loadedSecurityUsers.map(user => {
+                const statusClass = user.status === 'Active' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-rose-50 text-rose-600 border-rose-100';
+                return `
+                    <tr class="hover:bg-slate-50/50 transition cursor-pointer" onclick="openDocumentDetail('${user._id}')">
+                        <td class="px-4 py-3.5 font-bold text-slate-800">${escapeHtml(user.username)}</td>
+                        <td class="px-4 py-3.5 font-semibold text-slate-500">${escapeHtml(user.role)}</td>
+                        <td class="px-4 py-3.5 text-slate-400 max-w-[200px] truncate" title="${escapeHtml(user.permissions)}">${escapeHtml(user.permissions)}</td>
+                        <td class="px-4 py-3.5">
+                            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${statusClass}">
+                                ${escapeHtml(user.status)}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3.5 text-right" onclick="event.stopPropagation()">
+                            <button onclick="toggleUserStatus('${escapeHtml(user.username)}', '${user.status === 'Active' ? 'Suspended' : 'Active'}')" class="text-[10px] font-extrabold text-blue-500 hover:text-blue-700 transition">
+                                Toggle
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    function renderSecurityAccess() {
+        const tbody = document.getElementById('security-access-list');
+        if (!tbody) return;
+
+        if (loadedSecurityAccess.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-400 font-bold">No policies configured.</td></tr>';
+        } else {
+            tbody.innerHTML = loadedSecurityAccess.map(policy => `
+                <tr class="hover:bg-slate-50/50 transition cursor-pointer" onclick="openDocumentDetail('${policy._id}')">
+                    <td class="px-4 py-3.5 font-mono text-[10px] text-slate-600 font-bold">${escapeHtml(policy.resource)}</td>
+                    <td class="px-4 py-3.5 font-semibold text-slate-500">${escapeHtml(policy.allowed_roles)}</td>
+                    <td class="px-4 py-3.5 text-slate-400 font-medium">${escapeHtml(policy.auth_type)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    function renderSecurityLogs() {
+        const feed = document.getElementById('security-logs-feed');
+        if (!feed) return;
+
+        if (loadedSecurityLogs.length === 0) {
+            feed.innerHTML = '<div class="text-center py-6 text-slate-400 font-bold">No logs stored.</div>';
+        } else {
+            feed.innerHTML = loadedSecurityLogs.map(log => {
+                let severityClass = 'bg-slate-50 text-slate-600 border-slate-100';
+                if (log.severity === 'WARNING') severityClass = 'bg-amber-50 text-amber-600 border-amber-100';
+                if (log.severity === 'HIGH') severityClass = 'bg-orange-50 text-orange-600 border-orange-100';
+                if (log.severity === 'CRITICAL') severityClass = 'bg-rose-50 text-rose-600 border-rose-100';
+
+                const timeStr = log.timestamp.split('T')[1].substring(0, 8);
+
+                return `
+                    <div class="bg-white border border-slate-100 rounded-lg p-3 shadow-[0_1px_2px_rgba(0,0,0,0.01)] flex flex-col gap-1.5 hover:shadow-sm transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${severityClass}">${escapeHtml(log.severity)}</span>
+                                <span class="text-[10px] font-bold text-slate-800">${escapeHtml(log.user)}</span>
+                            </div>
+                            <span class="text-[9px] text-slate-400 font-semibold">${timeStr}</span>
+                        </div>
+                        <p class="text-xs text-slate-600 font-medium leading-normal">${escapeHtml(log.event)}</p>
+                        <div class="flex items-center gap-1 text-[9px] text-slate-400 font-semibold border-t border-slate-50 pt-1.5">
+                            <i class="fa-solid fa-desktop"></i>
+                            <span>IP: ${escapeHtml(log.ip_address)}</span>
+                            <span class="mx-1">•</span>
+                            <span class="text-green-500 font-bold">${escapeHtml(log.status)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    function changeSecurityPage(page) {
+        if (page < 1 || page > Math.ceil(totalSecurityLogs / securityPageSize)) return;
+        currentSecurityPage = page;
+        refreshSecurityDashboard();
+    }
+
+    function renderSecurityLogsPagination() {
+        const infoSpan = document.getElementById('sec-pagination-info');
+        const pagesDiv = document.getElementById('sec-pagination-pages');
+        if (!infoSpan || !pagesDiv) return;
+
+        if (totalSecurityLogs === 0) {
+            infoSpan.innerText = "Showing 0 to 0 of 0 entries";
+            pagesDiv.innerHTML = "";
+            return;
+        }
+
+        const startIdx = (currentSecurityPage - 1) * securityPageSize + 1;
+        const endIdx = Math.min(currentSecurityPage * securityPageSize, totalSecurityLogs);
+        infoSpan.innerText = `Showing ${startIdx} to ${endIdx} of ${totalSecurityLogs} entries`;
+
+        const totalPages = Math.ceil(totalSecurityLogs / securityPageSize);
+        let html = ``;
+
+        // Prev Button
+        const prevDisabled = currentSecurityPage === 1;
+        html += `
+            <button onclick="changeSecurityPage(${currentSecurityPage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] font-extrabold ${prevDisabled ? 'text-slate-300 bg-slate-50/50 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 transition'}">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+        `;
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            const isActive = currentSecurityPage === i;
+            html += `
+                <button onclick="changeSecurityPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg text-[10px] font-extrabold transition border ${isActive
+                    ? 'bg-gradient-to-tr from-[#0D99FF] to-indigo-600 border-indigo-600 text-white shadow-md shadow-[#0D99FF]/10'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }">
+                    ${i}
+                </button>
+            `;
+        }
+
+        // Next Button
+        const nextDisabled = currentSecurityPage === totalPages;
+        html += `
+            <button onclick="changeSecurityPage(${currentSecurityPage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] font-extrabold ${nextDisabled ? 'text-slate-300 bg-slate-50/50 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-50 transition'}">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        `;
+
+        pagesDiv.innerHTML = html;
+    }
+
+    async function toggleUserStatus(username, newStatus) {
+        const token = document.getElementById('admin-secret-token').value;
+        try {
+            const res = await fetch('/api/admin/security/user/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Token': token
+                },
+                body: JSON.stringify({ username, status: newStatus })
+            });
+
+            if (!res.ok) throw new Error('Failed to toggle status.');
+            refreshSecurityDashboard();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Dynamic operator UI personalizer
+    function personalizeOperatorUI(sessionData) {
+        const opName = document.getElementById('profile-operator-name');
+        const opRole = document.getElementById('profile-operator-role');
+        const opAvatar = document.getElementById('profile-avatar-img');
+
+        if (opName) opName.innerText = sessionData.username;
+        if (opRole) opRole.innerText = sessionData.role;
+
+        // Set beautiful customized avatar matches
+        if (opAvatar) {
+            if (sessionData.username === 'Jessica Parker') {
+                opAvatar.src = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=60";
+            } else if (sessionData.username === 'Michael Chang') {
+                opAvatar.src = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=60";
+            } else if (sessionData.username === 'Sarah Jenkins') {
+                opAvatar.src = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=60";
+            } else {
+                opAvatar.src = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=60";
+            }
+        }
+
+        // Inject dynamic token into hidden input so all CRUD calls automatically use it!
+        const tokenInput = document.getElementById('admin-secret-token');
+        if (tokenInput) tokenInput.value = sessionData.token;
+    }
+
+    function showLoginOverlay() {
+        const overlay = document.getElementById('admin-login-overlay');
+        overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+        overlay.classList.add('opacity-100');
+
+        const card = overlay.querySelector('.relative');
+        card.classList.remove('scale-95');
+        card.classList.add('scale-100');
+
+        const wrapper = document.getElementById('main-dashboard-wrapper');
+        if (wrapper) wrapper.classList.add('blur-md');
+    }
+
+    function hideLoginOverlay() {
+        const overlay = document.getElementById('admin-login-overlay');
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+
+        // Physical DOM removal layout fallback to ensure zero obstruction
+        setTimeout(() => {
+            if (overlay.classList.contains('opacity-0')) {
+                overlay.classList.add('hidden');
+            }
+        }, 500);
+
+        const card = overlay.querySelector('.relative');
+        card.classList.remove('scale-100');
+        card.classList.add('scale-95');
+
+        const wrapper = document.getElementById('main-dashboard-wrapper');
+        if (wrapper) wrapper.classList.remove('blur-md');
+    }
+
+    // Intercept native fetch globally — auto-injects auth token + drives GlobalLoader
+    const originalFetch = window.fetch;
+    window.fetch = async function (url, options = {}) {
+        const isAdminApi = typeof url === 'string' && url.startsWith('/api/admin/');
+
+        if (isAdminApi) {
+            GlobalLoader.start();
+            const session = localStorage.getItem('getmeds_admin_session');
+            if (session) {
+                try {
+                    const sessionData = JSON.parse(session);
+                    if (sessionData.token) {
+                        options.headers = options.headers || {};
+                        options.headers['X-Admin-Token'] = sessionData.token;
+                    }
+                } catch (e) { }
+            }
+        }
+
+        let response;
+        try {
+            response = await originalFetch(url, options);
+        } catch (netErr) {
+            if (isAdminApi) GlobalLoader.fail();
+            throw netErr;
+        }
+
+        if (isAdminApi) {
+            if (response.ok || response.status === 404) GlobalLoader.done();
+            else GlobalLoader.fail();
+        }
+
+        // If access token is expired (401), execute transparent silent token refresh rotation
+        if (response.status === 401 && !url.includes('/auth/login') && !url.includes('/auth/refresh')) {
+            try {
+                const refreshRes = await originalFetch('/api/admin/auth/refresh', { method: 'POST' });
+                if (refreshRes.ok) {
+                    const refreshData = await refreshRes.json();
+                    const session = localStorage.getItem('getmeds_admin_session');
+                    if (session) {
+                        const sessionData = JSON.parse(session);
+                        sessionData.token = refreshData.token;
+                        localStorage.setItem('getmeds_admin_session', JSON.stringify(sessionData));
+                        const tokenInput = document.getElementById('admin-secret-token');
+                        if (tokenInput) tokenInput.value = refreshData.token;
+                        options.headers = options.headers || {};
+                        options.headers['X-Admin-Token'] = refreshData.token;
+                        response = await originalFetch(url, options);
+                    }
+                } else {
+                    showToast('Session expired — please log in again.', 'warning');
+                    await handleLogout();
+                }
+            } catch (err) {
+                await handleLogout();
+            }
+        }
+        return response;
+    };
+
+    async function handleLoginSubmit(event) {
+        event.preventDefault();
+        const passcode = document.getElementById('login-passcode').value;
+        const alertBox = document.getElementById('login-alert-box');
+        const submitBtn = document.getElementById('login-btn-submit');
+
+        if (!passcode) {
+            showLoginAlert("Please enter your secret passcode key.", "error");
+            return;
+        }
+
+        setBtn(submitBtn, true, '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Verifying identity...</span>');
+        alertBox.classList.add('hidden');
+        GlobalLoader.start();
+
+        try {
+            const res = await originalFetch('/api/admin/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ passcode })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.detail || "Authentication failed.");
+            }
+
+            const sessionData = {
+                username: data.username,
+                role: data.role,
+                permissions: data.permissions,
+                token: data.token
+            };
+            localStorage.setItem('getmeds_admin_session', JSON.stringify(sessionData));
+            personalizeOperatorUI(sessionData);
+
+            showLoginAlert("Authentication successful! Loading console...", "success");
+            GlobalLoader.done();
+
+            setTimeout(() => {
+                hideLoginOverlay();
+                setBtn(submitBtn, false);
+                refreshAdminDashboard();
+            }, 900);
+
+        } catch (err) {
+            GlobalLoader.fail();
+            setBtn(submitBtn, false);
+            showLoginAlert(err.message, "error");
+        }
+    }
+
+    function showLoginAlert(message, type) {
+        const alertBox = document.getElementById('login-alert-box');
+        alertBox.classList.remove('hidden');
+        alertBox.innerText = message;
+
+        if (type === 'success') {
+            alertBox.className = "text-[11px] font-bold p-3 rounded-lg border flex items-start gap-2.5 bg-emerald-950/20 border-emerald-800/80 text-emerald-400";
+        } else {
+            alertBox.className = "text-[11px] font-bold p-3 rounded-lg border flex items-start gap-2.5 bg-rose-950/20 border-rose-800/80 text-rose-400";
+        }
+    }
+
+    async function handleLogout() {
+        localStorage.removeItem('getmeds_admin_session');
+        document.getElementById('login-passcode').value = '';
+        document.getElementById('login-alert-box').classList.add('hidden');
+
+        // Reset token input
+        document.getElementById('admin-secret-token').value = 'getmeds-admin-secret-key';
+
+        showLoginOverlay();
+
+        // Call backend logout route to completely clear HTTP-only cookies
+        try {
+            await originalFetch('/api/admin/auth/logout', { method: 'POST' });
+        } catch (e) { }
+    }
+
+    function togglePasswordVisibility() {
+        const input = document.getElementById('login-passcode');
+        const icon = document.getElementById('password-toggle-icon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fa-solid fa-eye-slash text-xs';
+        } else {
+            input.type = 'password';
+            icon.className = 'fa-solid fa-eye text-xs';
+        }
+    }
+
+    // Initialize Authentication on load
+    function initAdminAuth() {
+        const session = localStorage.getItem('getmeds_admin_session');
+        if (session) {
+            try {
+                const sessionData = JSON.parse(session);
+                personalizeOperatorUI(sessionData);
+                hideLoginOverlay();
+            } catch (e) {
+                localStorage.removeItem('getmeds_admin_session');
+                showLoginOverlay();
+            }
+        } else {
+            showLoginOverlay();
+        }
+    }
+
+    // ======= URL STATE MANAGEMENT =======
+    function syncUrlToState(docId = null) {
+        const params = new URLSearchParams();
+        params.set('collection', activeFilter);
+        params.set('page', currentPage);
+        if (docId) params.set('doc', docId);
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        history.pushState({ collection: activeFilter, page: currentPage, doc: docId || null }, '', newUrl);
+    }
+
+    function readUrlState() {
+        const params = new URLSearchParams(window.location.search);
+        const collection = params.get('collection');
+        const page = parseInt(params.get('page')) || 1;
+        const docId = params.get('doc');
+
+        if (collection === 'security') {
+            showSecurityControlPanel(true);
+        } else if (collection && COLLECTION_META[collection]) {
+            document.getElementById('security-control-panel').classList.add('hidden');
+            document.getElementById('database-hub-panel').classList.remove('hidden');
+            document.getElementById('sidebar-security-btn').classList.remove('text-slate-900', 'bg-slate-50', 'border-r-4', 'border-slate-900');
+            document.getElementById('sidebar-security-btn').classList.add('text-slate-500');
+
+            activeFilter = collection;
+            currentPage = page;
+            const meta = COLLECTION_META[collection];
+            document.getElementById('breadcrumb-filter-name').innerText = meta.label;
+            document.getElementById('table-active-title').innerText = meta.label;
+            document.getElementById('header-hub-title').innerText = `GetMEDS - ${meta.label}`;
+            refreshAdminDashboard();
+        } else {
+            refreshAdminDashboard();
+        }
+
+        if (docId) {
+            setTimeout(() => openDocumentDetail(docId), 600);
+        }
+    }
+
+    window.addEventListener('popstate', (event) => {
+        const state = event.state;
+        if (!state) return;
+
+        if (state.collection === 'security') {
+            showSecurityControlPanel(true);
+        } else {
+            document.getElementById('security-control-panel').classList.add('hidden');
+            document.getElementById('database-hub-panel').classList.remove('hidden');
+            document.getElementById('sidebar-security-btn').classList.remove('text-slate-900', 'bg-slate-50', 'border-r-4', 'border-slate-900');
+            document.getElementById('sidebar-security-btn').classList.add('text-slate-500');
+
+            activeFilter = state.collection || 'product';
+            currentPage = state.page || 1;
+            const meta = COLLECTION_META[activeFilter];
+            if (meta) {
+                document.getElementById('breadcrumb-filter-name').innerText = meta.label;
+                document.getElementById('table-active-title').innerText = meta.label;
+                document.getElementById('header-hub-title').innerText = `GetMEDS - ${meta.label}`;
+            }
+            if (state.doc) {
+                refreshAdminDashboard();
+                setTimeout(() => openDocumentDetail(state.doc), 600);
+            } else {
+                closeDocumentDetail(true);
+                refreshAdminDashboard();
+            }
+        }
+    });
+
+    // ======= DOCUMENT DETAIL PANEL =======
+    let activeDetailDocId = null;
+
+    async function openDocumentDetail(docId) {
+        activeDetailDocId = docId;
+        syncUrlToState(docId);
+
+        const panel = document.getElementById('document-detail-panel');
+        const backdrop = document.getElementById('document-detail-backdrop');
+        const content = document.getElementById('detail-panel-content');
+        const titleEl = document.getElementById('detail-panel-title');
+        const idEl = document.getElementById('detail-panel-id');
+        const badgeEl = document.getElementById('detail-panel-type-badge');
+        const tsEl = document.getElementById('detail-panel-timestamps');
+
+        // Show panel
+        panel.classList.remove('translate-x-full');
+        backdrop.classList.remove('opacity-0', 'pointer-events-none');
+        backdrop.classList.add('opacity-100');
+
+        // Loading state
+        content.innerHTML = `<div class="flex items-center justify-center py-16 text-slate-300"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>`;
+        idEl.textContent = docId;
+        titleEl.textContent = 'Loading...';
+
+        try {
+            const res = await fetch(getAdminApiUrl(`document/${docId}`));
+            if (!res.ok) throw new Error('Failed to load document.');
+            const data = await res.json();
+            const doc = data.document;
+
+            const meta = COLLECTION_META[doc._type] || { label: doc._type, badge: 'bg-slate-50 text-slate-600 border-slate-100/50' };
+            const fieldDefs = FIELD_SCHEMAS[doc._type] || [];
+
+            // Update header
+            const primaryLabel = doc.name || doc.title || doc.question || doc.sessionId || doc._id;
+            titleEl.textContent = primaryLabel;
+            idEl.innerHTML = `<span>${doc._id}</span> <a href="/admin/document/${doc._id}" class="ml-2 text-[9px] font-bold text-blue-500 hover:text-blue-700 underline underline-offset-2 transition">Open Full Edit →</a>`;
+            badgeEl.textContent = meta.label;
+            badgeEl.className = `text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border ${meta.badge}`;
+
+            // Timestamps
+            const created = doc._createdAt ? new Date(doc._createdAt).toLocaleString() : '—';
+            const updated = doc._updatedAt ? new Date(doc._updatedAt).toLocaleString() : '—';
+            tsEl.innerHTML = `<i class="fa-solid fa-clock mr-1"></i>Created: ${created}`;
+
+            // Build field rows from FIELD_SCHEMAS definition
+            let html = `<div class="flex flex-col gap-5">`;
+
+            // Show _id at top
+            html += renderDetailField('Document ID', `<span class="font-mono text-[10px] text-slate-700 break-all">${escapeHtml(doc._id)}</span>`);
+
+            fieldDefs.forEach(field => {
+                const val = doc[field.name];
+                let display;
+                if (val === undefined || val === null || val === '') {
+                    display = `<span class="text-slate-300 italic text-xs">—</span>`;
+                } else if (field.name === 'availability') {
+                    display = val === true
+                        ? `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-green-50 text-green-600 border-green-100">In Stock</span>`
+                        : `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-rose-50 text-rose-500 border-rose-100">Out of Stock</span>`;
+                } else if ((field.name === 'keywords' || field.name === 'subCategories') && Array.isArray(val)) {
+                    display = val.map(k => `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-600">${escapeHtml(k)}</span>`).join(' ');
+                } else if (field.name === 'category') {
+                    const catId = val?._ref || val;
+                    const cat = (window.cachedCategories || []).find(c => c._id === catId);
+                    display = `<span class="text-xs font-semibold text-slate-700">${escapeHtml(cat?.title || catId || '—')}</span>`;
+                } else if (field.type === 'number') {
+                    display = `<span class="font-extrabold text-slate-800 text-sm">₱${Number(val).toLocaleString()}</span>`;
+                } else if (field.type === 'textarea') {
+                    display = `<p class="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">${escapeHtml(String(val))}</p>`;
+                } else {
+                    display = `<span class="text-xs font-semibold text-slate-700">${escapeHtml(String(val))}</span>`;
+                }
+                html += renderDetailField(field.label, display);
+            });
+
+            html += `</div>`;
+            content.innerHTML = html;
+
+        } catch (err) {
+            content.innerHTML = `<div class="text-center py-12 text-rose-500"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p class="text-xs font-bold mt-2">${escapeHtml(err.message)}</p></div>`;
+        }
+    }
+
+    function renderDetailField(label, valueHtml) {
+        return `<div class="flex flex-col gap-1.5 border-b border-slate-50 pb-4">
+            <span class="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">${escapeHtml(label)}</span>
+            <div>${valueHtml}</div>
+        </div>`;
+    }
+
+    function closeDocumentDetail(skipUrl = false) {
+        activeDetailDocId = null;
+        const panel = document.getElementById('document-detail-panel');
+        const backdrop = document.getElementById('document-detail-backdrop');
+        panel.classList.add('translate-x-full');
+        backdrop.classList.remove('opacity-100');
+        backdrop.classList.add('opacity-0', 'pointer-events-none');
+        if (!skipUrl) syncUrlToState(null);
+    }
+
+    async function deleteFromDetail() {
+        if (!activeDetailDocId) return;
+        if (!await customConfirm({
+            title: 'Delete Document',
+            message: 'Are you sure you want to delete this document? This action cannot be undone.',
+            confirmText: 'Yes, Delete'
+        })) return;
+        const docId = activeDetailDocId;
+        const btn = document.querySelector('#document-detail-panel button[onclick="deleteFromDetail()"]');
+        if (btn) setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Deleting...');
+        GlobalLoader.start();
+        try {
+            const res = await fetch(getAdminApiUrl(`document/${docId}`), { method: 'DELETE' });
+            if (!res.ok) throw new Error('Could not delete document.');
+            GlobalLoader.done();
+            showToast('Document deleted successfully.', 'success');
+            closeDocumentDetail();
+            refreshAdminDashboard();
+            if (btn) setBtn(btn, false);
+        } catch (err) {
+            GlobalLoader.fail();
+            showToast(err.message, 'error');
+            if (btn) setBtn(btn, false);
+        }
+    }
+
+    // ======= BULK SELECTION =======
+    let selectedIds = new Set();
+
+    function toggleRowSelection(cb) {
+        const id = cb.dataset.id;
+        if (cb.checked) selectedIds.add(id);
+        else selectedIds.delete(id);
+        updateBulkBar();
+        // Highlight row
+        cb.closest('tr').classList.toggle('bg-blue-50/60', cb.checked);
+    }
+
+    function toggleSelectAll(checked) {
+        document.querySelectorAll('.row-checkbox').forEach(cb => {
+            cb.checked = checked;
+            const id = cb.dataset.id;
+            if (checked) selectedIds.add(id);
+            else selectedIds.delete(id);
+            cb.closest('tr').classList.toggle('bg-blue-50/60', checked);
+        });
+        updateBulkBar();
+    }
+
+    function updateBulkBar() {
+        const bar = document.getElementById('bulk-action-bar');
+        const countEl = document.getElementById('bulk-count');
+        if (selectedIds.size > 0) {
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+            countEl.textContent = selectedIds.size;
+        } else {
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+        }
+    }
+
+    function clearBulkSelection() {
+        selectedIds.clear();
+        document.querySelectorAll('.row-checkbox').forEach(cb => { cb.checked = false; cb.closest('tr').classList.remove('bg-blue-50/60'); });
+        const sa = document.getElementById('select-all-checkbox');
+        if (sa) sa.checked = false;
+        updateBulkBar();
+    }
+
+    async function confirmBulkDelete() {
+        const ids = [...selectedIds];
+        if (!ids.length) return;
+        if (!await customConfirm({
+            title: 'Bulk Deletion',
+            message: `Are you sure you want to delete ${ids.length} selected document(s)? This action cannot be undone.`,
+            confirmText: `Yes, Delete ${ids.length}`
+        })) return;
+        const btn = document.querySelector('[onclick="confirmBulkDelete()"]');
+        if (btn) setBtn(btn, true, `<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Deleting ${ids.length}...`);
+        GlobalLoader.start();
+        try {
+            const res = await fetch(getAdminApiUrl('bulk'), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail);
+            GlobalLoader.done();
+            showToast(`${ids.length} document(s) deleted successfully.`, 'success');
+            clearBulkSelection();
+            refreshAdminDashboard();
+            if (btn) setBtn(btn, false);
+        } catch(e) {
+            GlobalLoader.fail();
+            showToast('Bulk delete failed: ' + e.message, 'error');
+            if (btn) setBtn(btn, false);
+        }
+    }
+
+    // ======= BULK EDIT =======
+    function openBulkEditModal() {
+        const fields = TABLE_SCHEMAS[activeFilter] || [];
+        const select = document.getElementById('bulk-edit-field');
+        select.innerHTML = '<option value="">— Select a field —</option>' +
+            fields.map(f => `<option value="${f.key}" data-type="${f.type||'text'}">${f.label}</option>`).join('');
+        document.getElementById('bulk-edit-count').textContent = selectedIds.size;
+        document.getElementById('bulk-edit-value-wrap').classList.add('hidden');
+        // Reset to form view
+        document.getElementById('bulk-edit-form-section').classList.remove('hidden');
+        document.getElementById('bulk-edit-progress-section').classList.remove('flex');
+        document.getElementById('bulk-edit-progress-section').classList.add('hidden');
+        document.getElementById('bulk-edit-log').innerHTML = '';
+        document.getElementById('bulk-edit-apply-btn').disabled = false;
+        document.getElementById('bulk-edit-apply-btn').innerHTML = '<i class="fa-solid fa-check text-[10px]"></i> Apply to All';
+        document.getElementById('bulk-edit-cancel-btn').textContent = 'Cancel';
+        const m = document.getElementById('bulk-edit-modal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+    }
+
+    function closeBulkEditModal() {
+        const m = document.getElementById('bulk-edit-modal');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+
+    function updateBulkEditValueInput() {
+        const select = document.getElementById('bulk-edit-field');
+        const opt = select.options[select.selectedIndex];
+        const type = opt.dataset.type || 'text';
+        const wrap = document.getElementById('bulk-edit-value-wrap');
+        const container = document.getElementById('bulk-edit-value-container');
+        const base = 'w-full border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-700 bg-white transition';
+        if (!select.value) { wrap.classList.add('hidden'); return; }
+        wrap.classList.remove('hidden');
+        if (type === 'availability') {
+            container.innerHTML = `<select id="bulk-edit-value" class="${base}"><option value="true">In Stock</option><option value="false">Out of Stock</option></select>`;
+        } else if (type === 'price') {
+            container.innerHTML = `<input type="number" id="bulk-edit-value" step="0.01" class="${base}" placeholder="Enter new price">`;
+        } else {
+            container.innerHTML = `<input type="text" id="bulk-edit-value" class="${base}" placeholder="Enter new value">`;
+        }
+    }
+
+    // Patches a single table cell in the DOM immediately — no full refresh needed
+    function patchTableCell(docId, field, value, fieldDef) {
+        const row = document.querySelector(`tr[data-id="${docId}"]`);
+        if (!row) return;
+        const schema = TABLE_SCHEMAS[activeFilter] || [];
+        const colIndex = schema.findIndex(c => c.key === field);
+        if (colIndex === -1) return;
+        // +2 because first cell is checkbox, second is ID
+        const cells = row.querySelectorAll('td');
+        const targetCell = cells[colIndex + 2];
+        if (!targetCell) return;
+
+        let display = '';
+        const type = fieldDef?.type;
+        if (type === 'price') {
+            display = value != null
+                ? `<span class="font-extrabold text-slate-800">₱${Number(value).toLocaleString()}</span>`
+                : '<span class="text-slate-300">—</span>';
+        } else if (type === 'availability') {
+            display = value === true
+                ? '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-green-50 text-green-600 border-green-100">In Stock</span>'
+                : '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-rose-50 text-rose-500 border-rose-100">Out of Stock</span>';
+        } else {
+            const txt = String(value ?? '—');
+            display = fieldDef?.truncate
+                ? `<span class="block truncate max-w-[200px] text-slate-500">${escapeHtml(txt)}</span>`
+                : `<span class="font-semibold text-slate-700">${escapeHtml(txt)}</span>`;
+        }
+        targetCell.innerHTML = display;
+        // Flash the cell green briefly to signal the update
+        targetCell.style.transition = 'background 0.2s';
+        targetCell.style.background = '#dcfce7';
+        setTimeout(() => { targetCell.style.background = ''; }, 800);
+    }
+
+    async function executeBulkEdit() {
+        const field = document.getElementById('bulk-edit-field').value;
+        const valEl = document.getElementById('bulk-edit-value');
+        if (!field || !valEl || !valEl.value.toString().trim()) {
+            showToast('Select a field and enter a value.', 'warning'); return;
+        }
+
+        let value = valEl.value;
+        const fieldDef = (TABLE_SCHEMAS[activeFilter] || []).find(f => f.key === field);
+        if (fieldDef?.type === 'availability') value = value === 'true';
+        else if (fieldDef?.type === 'price') value = parseFloat(value);
+
+        const ids = [...selectedIds];
+        const total = ids.length;
+
+        // Switch modal to progress view
+        document.getElementById('bulk-edit-form-section').classList.add('hidden');
+        document.getElementById('bulk-edit-progress-section').classList.remove('hidden');
+        document.getElementById('bulk-edit-progress-section').classList.add('flex');
+        document.getElementById('bulk-edit-apply-btn').disabled = true;
+        document.getElementById('bulk-edit-apply-btn').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Running...';
+        document.getElementById('bulk-edit-cancel-btn').disabled = true;
+
+        const log = document.getElementById('bulk-edit-log');
+        const progressBar = document.getElementById('bulk-progress-bar');
+        const progressLabel = document.getElementById('bulk-progress-label');
+        const progressFraction = document.getElementById('bulk-progress-fraction');
+
+        // Pre-populate all rows as "pending"
+        const logRows = {};
+        ids.forEach(id => {
+            const el = document.createElement('div');
+            el.id = `blog-${id}`;
+            el.className = 'flex items-center gap-2.5 py-2 border-b border-slate-50 last:border-0';
+            el.innerHTML = `
+                <div id="blog-icon-${id}" class="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-clock text-[8px] text-slate-400"></i>
+                </div>
+                <span class="font-mono text-[10px] text-slate-500 flex-1 truncate">${escapeHtml(id)}</span>
+                <span id="blog-status-${id}" class="text-[9px] font-bold text-slate-400">Pending</span>`;
+            log.appendChild(el);
+            logRows[id] = el;
+        });
+
+        let done = 0, failed = 0;
+
+        for (let i = 0; i < ids.length; i++) {
+            const id = ids[i];
+
+            // Mark as "applying"
+            document.getElementById(`blog-icon-${id}`).innerHTML =
+                '<i class="fa-solid fa-spinner fa-spin text-[8px] text-blue-500"></i>';
+            document.getElementById(`blog-icon-${id}`).className =
+                'w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center shrink-0';
+            document.getElementById(`blog-status-${id}`).textContent = 'Applying...';
+            document.getElementById(`blog-status-${id}`).className = 'text-[9px] font-bold text-blue-500';
+
+            // Scroll log to bottom so current item is always visible
+            log.scrollTop = log.scrollHeight;
+
+            // Update header label
+            progressLabel.textContent = `Applying to ${id}`;
+            progressFraction.textContent = `${i + 1} / ${total}`;
+            progressBar.style.width = `${Math.round(((i) / total) * 100)}%`;
+
+            try {
+                const res = await fetch(getAdminApiUrl(`document/${id}`), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [field]: value })
+                });
+
+                if (res.ok) {
+                    done++;
+                    document.getElementById(`blog-icon-${id}`).innerHTML =
+                        '<i class="fa-solid fa-check text-[8px] text-green-600"></i>';
+                    document.getElementById(`blog-icon-${id}`).className =
+                        'w-5 h-5 rounded-full bg-green-100 flex items-center justify-center shrink-0';
+                    document.getElementById(`blog-status-${id}`).textContent = 'Updated';
+                    document.getElementById(`blog-status-${id}`).className = 'text-[9px] font-bold text-green-600';
+                    // Immediately patch the table row cell — no full refresh needed
+                    patchTableCell(id, field, value, fieldDef);
+                } else {
+                    throw new Error('API error');
+                }
+            } catch(e) {
+                failed++;
+                document.getElementById(`blog-icon-${id}`).innerHTML =
+                    '<i class="fa-solid fa-xmark text-[8px] text-rose-500"></i>';
+                document.getElementById(`blog-icon-${id}`).className =
+                    'w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center shrink-0';
+                document.getElementById(`blog-status-${id}`).textContent = 'Failed';
+                document.getElementById(`blog-status-${id}`).className = 'text-[9px] font-bold text-rose-500';
+            }
+        }
+
+        // Final state
+        progressBar.style.width = '100%';
+        progressBar.className = failed === 0
+            ? 'h-1.5 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-300'
+            : 'h-1.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-300';
+        progressLabel.textContent = failed === 0 ? `All ${done} documents updated!` : `${done} updated, ${failed} failed`;
+        progressFraction.textContent = `${done} / ${total}`;
+
+        document.getElementById('bulk-edit-apply-btn').innerHTML =
+            `<i class="fa-solid fa-check text-[10px]"></i> Done`;
+        document.getElementById('bulk-edit-apply-btn').disabled = false;
+        document.getElementById('bulk-edit-apply-btn').onclick = () => {
+            closeBulkEditModal();
+            clearBulkSelection();
+            document.getElementById('bulk-edit-apply-btn').onclick = executeBulkEdit;
+        };
+        document.getElementById('bulk-edit-cancel-btn').disabled = false;
+        document.getElementById('bulk-edit-cancel-btn').textContent = 'Close';
+
+        if (failed > 0) showToast(`${done} updated, ${failed} failed.`, 'warning');
+        else showToast(`${done} document(s) updated successfully!`, 'success');
+    }
+
+    // ======= EXPORT =======
+    function toggleExportDropdown() {
+        const dd = document.getElementById('export-dropdown');
+        dd.classList.toggle('hidden');
+    }
+    document.addEventListener('click', (e) => {
+        const wrap = document.getElementById('export-dropdown-wrap');
+        if (wrap && !wrap.contains(e.target)) {
+            document.getElementById('export-dropdown')?.classList.add('hidden');
+        }
+    });
+    function exportCollection(fmt) {
+        const token = document.getElementById('admin-secret-token')?.value || 'getmeds-admin-secret-key';
+        window.location.href = getAdminApiUrl(`bulk/export/${activeFilter}?fmt=${fmt}`);
+        document.getElementById('export-dropdown').classList.add('hidden');
+    }
+
+    // ======= IMPORT =======
+    const IMPORT_FIELD_SCHEMAS = {
+        product: ['name','price','availability','strength','packaging','description'],
+        category: ['title','subtitle','description','icon'],
+        heroSlide: ['title','subtitle','primaryButtonText','primaryButtonLink','secondaryButtonText','secondaryButtonLink'],
+        service: ['title','description','icon','link'],
+        dealOfDay: ['subtitle','backgroundText','priceOverride'],
+        categoryBanner: ['title','subtitle','buttonText','buttonLink'],
+        team: ['name','role','bio'],
+        faq: ['question','answer','keywords'],
+        chatSession: ['sessionId','userName','lastSubject','sessionSummary'],
+    };
+
+    let importFileObject = null;
+    let importParsedRows = [];
+
+    function openImportModal() {
+        importFileObject = null; importParsedRows = [];
+        document.getElementById('import-file-input').value = '';
+        document.getElementById('import-step-upload').classList.remove('hidden');
+        document.getElementById('import-step-preview').classList.add('hidden');
+        document.getElementById('import-step-result').classList.add('hidden');
+        document.getElementById('import-action-btn').disabled = true;
+        document.getElementById('import-btn-label').textContent = 'Import';
+        document.getElementById('import-file-info').innerHTML = '<i class="fa-solid fa-file text-slate-300 text-sm"></i><span class="text-[10px] text-slate-400">No file selected</span>';
+        const meta = COLLECTION_META[activeFilter] || { label: activeFilter };
+        document.getElementById('import-modal-subtitle').textContent = `Bulk create ${meta.label} from CSV, XLSX, or JSON`;
+        document.getElementById('import-collection-label').textContent = meta.label;
+        const fields = IMPORT_FIELD_SCHEMAS[activeFilter] || [];
+        document.getElementById('import-field-chips').innerHTML = fields.map(f =>
+            `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 font-mono">${f}</span>`
+        ).join('');
+        const m = document.getElementById('import-modal');
+        m.classList.remove('hidden'); m.classList.add('flex');
+    }
+    function closeImportModal() {
+        const m = document.getElementById('import-modal');
+        m.classList.add('hidden'); m.classList.remove('flex');
+    }
+    function handleImportDrop(e) {
+        e.preventDefault();
+        document.getElementById('import-drop-zone').classList.remove('border-blue-400','bg-blue-50/40');
+        const file = e.dataTransfer.files[0];
+        if (file) processImportFile(file);
+    }
+    function handleImportFileSelect(e) {
+        const file = e.target.files[0];
+        if (file) processImportFile(file);
+    }
+
+    async function processImportFile(file) {
+        importFileObject = file;
+        document.getElementById('import-file-info').innerHTML =
+            `<i class="fa-solid fa-file text-blue-400 text-sm"></i><span class="text-[10px] font-semibold text-slate-600">${escapeHtml(file.name)} (${(file.size/1024).toFixed(1)} KB)</span>`;
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        let rows = [];
+        try {
+            if (ext === 'json') {
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+                rows = Array.isArray(parsed) ? parsed : [parsed];
+            } else if (ext === 'csv') {
+                const text = await file.text();
+                const lines = text.split('\n').filter(l => l.trim());
+                const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                rows = lines.slice(1).map(line => {
+                    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                    return Object.fromEntries(headers.map((h,i) => [h, vals[i] ?? '']));
+                });
+            } else if (ext === 'xlsx' || ext === 'xls') {
+                // For XLSX, we show "ready to upload" — backend parses it
+                rows = [{ note: 'XLSX preview not available in browser — backend will parse on import.' }];
+            }
+        } catch(e) {
+            alert('Could not parse file: ' + e.message); return;
+        }
+        importParsedRows = rows;
+        showImportPreview(rows, ext === 'xlsx' || ext === 'xls');
+    }
+
+    function showImportPreview(rows, isXlsx) {
+        document.getElementById('import-step-upload').classList.add('hidden');
+        document.getElementById('import-step-preview').classList.remove('hidden');
+        document.getElementById('import-step-preview').classList.add('flex');
+        document.getElementById('import-total-rows').textContent = `${rows.length} rows detected`;
+        if (isXlsx) {
+            document.getElementById('import-preview-thead').innerHTML = '<tr><th class="px-4 py-2">Note</th></tr>';
+            document.getElementById('import-preview-tbody').innerHTML = '<tr><td class="px-4 py-2 text-xs text-slate-600">XLSX file ready — click Import to process via backend.</td></tr>';
+        } else {
+            const previewRows = rows.slice(0, 5);
+            const headers = previewRows.length > 0 ? Object.keys(previewRows[0]) : [];
+            document.getElementById('import-preview-thead').innerHTML = `<tr>${headers.map(h => `<th class="px-4 py-2">${escapeHtml(h)}</th>`).join('')}</tr>`;
+            document.getElementById('import-preview-tbody').innerHTML = previewRows.map(row =>
+                `<tr class="hover:bg-slate-50">${headers.map(h => `<td class="px-4 py-2 max-w-[120px] truncate">${escapeHtml(String(row[h] ?? ''))}</td>`).join('')}</tr>`
+            ).join('');
+        }
+        document.getElementById('import-action-btn').disabled = false;
+        document.getElementById('import-btn-label').textContent = `Import ${importParsedRows.length} Records`;
+    }
+
+    async function executeImport() {
+        if (!importFileObject) return;
+        const token = document.getElementById('admin-secret-token')?.value || 'getmeds-admin-secret-key';
+        const btn = document.getElementById('import-action-btn');
+        btn.disabled = true;
+        document.getElementById('import-btn-label').textContent = 'Importing...';
+        const formData = new FormData();
+        formData.append('file', importFileObject);
+        try {
+            const res = await fetch(getAdminApiUrl(`bulk/import/${activeFilter}`), {
+                method: 'POST',
+                headers: { 'X-Admin-Token': token },
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail);
+            showImportResult(data);
+        } catch(e) {
+            showImportResult(null, e.message);
+        }
+    }
+
+    function showImportResult(data, error) {
+        document.getElementById('import-step-preview').classList.add('hidden');
+        document.getElementById('import-step-preview').classList.remove('flex');
+        const step = document.getElementById('import-step-result');
+        step.classList.remove('hidden'); step.classList.add('flex');
+        if (error) {
+            document.getElementById('import-result-icon').innerHTML = '<i class="fa-solid fa-xmark text-3xl text-rose-500"></i>';
+            document.getElementById('import-result-icon').className = 'w-16 h-16 rounded-2xl bg-rose-100 flex items-center justify-center';
+            document.getElementById('import-result-title').textContent = 'Import Failed';
+            document.getElementById('import-result-body').textContent = error;
+        } else {
+            document.getElementById('import-result-icon').innerHTML = '<i class="fa-solid fa-check text-3xl text-green-500"></i>';
+            document.getElementById('import-result-icon').className = 'w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center';
+            document.getElementById('import-result-title').textContent = `${data.imported} of ${data.total} records imported!`;
+            document.getElementById('import-result-body').textContent = data.failed > 0 ? `${data.failed} rows had errors.` : 'All records created successfully.';
+            if (data.errors && data.errors.length > 0) {
+                document.getElementById('import-errors-box').classList.remove('hidden');
+                document.getElementById('import-errors-list').innerHTML = data.errors.map(e =>
+                    `<p class="text-[10px] text-rose-600 font-mono">Row ${e.row}: ${escapeHtml(e.error)}</p>`
+                ).join('');
+            }
+            document.getElementById('import-action-btn').innerHTML = '<i class="fa-solid fa-rotate-right text-[10px]"></i> <span>Done</span>';
+            document.getElementById('import-action-btn').disabled = false;
+            document.getElementById('import-action-btn').onclick = () => { closeImportModal(); refreshAdminDashboard(); };
+        }
+    }
+
+    function downloadTemplate() {
+        const fields = IMPORT_FIELD_SCHEMAS[activeFilter] || [];
+        const csv = fields.join(',') + '\n';
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${activeFilter}_template.csv`;
+        a.click();
+    }
+
+    // Run Auth Check
+    initAdminAuth();
+
+    // Read URL state on load (restores collection/page/doc from URL)
+    readUrlState();
+
+</script>

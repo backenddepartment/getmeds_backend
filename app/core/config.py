@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PORT: int = 8000
     CHAT_HISTORY_LIMIT: int = 30
+    ADMIN_TOKEN: str = "getmeds-admin-secret-key"
+
+    # Security Database Configuration
+    SANITY_SECURITY_PROJECT_ID: str
+    SANITY_SECURITY_DATASET: str = "security"
 
     class Config:
         env_file = ".env"

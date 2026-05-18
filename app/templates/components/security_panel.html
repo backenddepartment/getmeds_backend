@@ -1,0 +1,120 @@
+<!-- Sibling 2: Access & Security Workspace -->
+<div class="hidden flex flex-col gap-6 w-full" id="security-control-panel">
+    <!-- Top Breadcrumbs Action bar -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <button onclick="hideSecurityControlPanel()" class="text-slate-400 hover:text-slate-700 transition">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </button>
+            <nav class="flex items-center text-xs font-semibold text-slate-400 gap-1.5">
+                <span class="hover:text-slate-600 cursor-pointer">Admin Backend</span>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300"></i>
+                <span class="text-slate-800 font-bold">Access & Security Control</span>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Profile Security Header Card Widget -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-100 pb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-[68px] h-[68px] bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-md shrink-0">
+                <i class="fa-solid fa-shield-halved text-3xl text-amber-500"></i>
+            </div>
+            <div class="flex flex-col">
+                <h2 class="text-2xl font-extrabold text-slate-800 leading-tight">Access & Security Console</h2>
+                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span class="bg-[#D1FAE5] text-[#065F46] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-[#A7F3D0]/60 shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
+                        <i class="fa-solid fa-shield-halved text-[9px]"></i> Sanity Security DB Active
+                    </span>
+                    <span class="text-[10px] text-slate-400 font-medium">Sanity CMS (adminUser, securityLog, accessPoint)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top stats columns -->
+        <div class="flex items-center gap-6">
+            <div class="border-l border-slate-200/80 pl-4">
+                <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-extrabold text-slate-800" id="sec-stat-users">4</span>
+                </div>
+                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Admin Users</span>
+            </div>
+            <div class="border-l border-slate-200/80 pl-4">
+                <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-extrabold text-slate-800" id="sec-stat-rules">4</span>
+                </div>
+                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Access Rules</span>
+            </div>
+        </div>
+    </div>
+    <!-- Sub-Tabs Navigation Bar -->
+    <div class="flex items-center gap-2 border-b border-slate-100 pb-px shrink-0 mt-2">
+        <button onclick="switchSecurityTab('users')" id="sec-tab-btn-users" class="sec-tab-btn active px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-all flex items-center gap-2">
+            <i class="fa-solid fa-user-shield text-sm"></i>
+            <span>Admin Users</span>
+        </button>
+        <button onclick="switchSecurityTab('policies')" id="sec-tab-btn-policies" class="sec-tab-btn px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-all flex items-center gap-2">
+            <i class="fa-solid fa-lock text-sm"></i>
+            <span>Access Policies</span>
+        </button>
+        <button onclick="switchSecurityTab('logs')" id="sec-tab-btn-logs" class="sec-tab-btn px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition-all flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-sm"></i>
+            <span>Security Audit Logs</span>
+        </button>
+    </div>
+
+    <!-- Workspace Panel Container -->
+    <div class="w-full">
+        <!-- Panel 1: Admin Users -->
+        <div id="sec-panel-users" class="flex flex-col gap-4 w-full">
+            <div class="overflow-x-auto w-full border border-slate-100 rounded-lg bg-white shadow-sm">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
+                            <th class="px-4 py-3">User</th>
+                            <th class="px-4 py-3">Role</th>
+                            <th class="px-4 py-3">Permissions</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3 w-20"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="security-users-list" class="text-xs text-slate-600 divide-y divide-slate-100/60">
+                        <!-- User list populated dynamically from getmeds_security -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 2: Access Policies -->
+        <div id="sec-panel-policies" class="hidden flex flex-col gap-4 w-full">
+            <div class="overflow-x-auto w-full border border-slate-100 rounded-lg bg-white shadow-sm">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
+                            <th class="px-4 py-3">Resource / Path</th>
+                            <th class="px-4 py-3">Allowed Roles</th>
+                            <th class="px-4 py-3">Auth Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="security-access-list" class="text-xs text-slate-600 divide-y divide-slate-100/60">
+                        <!-- Access points populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 3: Security Audit Logs -->
+        <div id="sec-panel-logs" class="hidden flex flex-col gap-4 w-full">
+            <div class="flex flex-col gap-3 max-h-[560px] overflow-y-auto custom-scrollbar pr-1" id="security-logs-feed">
+                <!-- Logs dynamically loaded -->
+            </div>
+            <!-- Premium Security Table Pagination Controls -->
+            <div class="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 pt-4 mt-2 px-2 gap-4">
+                <span class="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider" id="sec-pagination-info">Showing 0 to 0 of 0 entries</span>
+                <div class="flex items-center gap-1.5" id="sec-pagination-pages">
+                    <!-- Dynamic page list buttons will render here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,551 @@
+{% include 'components/head.html' %}
+<body class="bg-[#F8FAFC] min-h-screen flex flex-col">
+
+<!-- ===== TOP NAV BAR ===== -->
+<header class="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/admin" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition text-slate-500">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </a>
+            <div class="h-5 w-px bg-slate-200"></div>
+            <nav class="flex items-center text-xs font-semibold text-slate-400 gap-1.5">
+                <a href="/admin" class="hover:text-slate-700 transition">Admin Console</a>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300"></i>
+                <span id="nav-collection" class="hover:text-slate-700 transition cursor-pointer">Collection</span>
+                <i class="fa-solid fa-chevron-right text-[8px] text-slate-300"></i>
+                <span class="text-slate-800 font-bold truncate max-w-[200px]" id="nav-doc-title">Loading...</span>
+            </nav>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="header-type-badge" class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-slate-50 text-slate-600 border-slate-200"></span>
+            <button onclick="deleteDocument()" id="btn-delete"
+                class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-500 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-trash-can text-[10px]"></i> Delete
+            </button>
+            <button onclick="saveDocument()" id="btn-save"
+                class="px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#61A644] to-[#0D99FF] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-floppy-disk text-[10px]"></i> Save Changes
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+
+    <!-- Loading skeleton -->
+    <div id="page-skeleton" class="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-pulse">
+        <div class="lg:col-span-3 flex flex-col gap-4">
+            <div class="bg-white rounded-2xl border border-slate-100 p-6 flex flex-col gap-4">
+                <div class="w-32 h-4 skeleton rounded-md"></div>
+                <div class="w-full h-10 skeleton rounded-lg"></div>
+                <div class="w-full h-10 skeleton rounded-lg"></div>
+                <div class="w-full h-24 skeleton rounded-lg"></div>
+                <div class="w-full h-10 skeleton rounded-lg"></div>
+            </div>
+        </div>
+        <div class="lg:col-span-2 flex flex-col gap-4">
+            <div class="bg-white rounded-2xl border border-slate-100 p-6">
+                <div class="w-full h-48 skeleton rounded-xl"></div>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-100 p-6 flex flex-col gap-3">
+                <div class="w-24 h-3 skeleton rounded-md"></div>
+                <div class="w-full h-4 skeleton rounded-md"></div>
+                <div class="w-full h-4 skeleton rounded-md"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actual content (hidden until loaded) -->
+    <div id="page-content" class="hidden grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        <!-- LEFT: Editable Fields -->
+        <div class="lg:col-span-3 flex flex-col gap-6">
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6">
+                <div class="flex items-center gap-2 mb-6">
+                    <i class="fa-solid fa-pen-to-square text-slate-400 text-sm"></i>
+                    <h2 class="text-sm font-extrabold text-slate-800">Document Fields</h2>
+                </div>
+                <div id="fields-container" class="flex flex-col gap-5"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Image + Metadata -->
+        <div class="lg:col-span-2 flex flex-col gap-5">
+
+            <!-- Image Upload Card -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6" id="image-card">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-image text-slate-400 text-sm"></i>
+                        <h3 class="text-sm font-extrabold text-slate-800">Image</h3>
+                    </div>
+                    <button onclick="triggerImageInput()" id="replace-btn"
+                        class="hidden text-[10px] font-bold text-blue-500 hover:text-blue-700 transition flex items-center gap-1">
+                        <i class="fa-solid fa-arrows-rotate text-[9px]"></i> Replace
+                    </button>
+                </div>
+
+                <!-- Upload Zone -->
+                <div id="upload-zone"
+                    class="relative border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-200 group"
+                    onclick="triggerImageInput()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+                    <div class="w-14 h-14 rounded-xl bg-slate-100 group-hover:bg-blue-100 transition flex items-center justify-center">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-blue-500 transition"></i>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs font-bold text-slate-700">Upload Image</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Drag & drop or click to browse</p>
+                        <p class="text-[9px] text-slate-300 mt-1">JPG, PNG, WebP — max 10MB</p>
+                    </div>
+                    <div id="upload-progress" class="hidden w-full">
+                        <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                            <div id="progress-bar" class="bg-gradient-to-r from-[#61A644] to-[#0D99FF] h-1.5 rounded-full transition-all duration-300" style="width:0%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-400 text-center mt-1.5" id="upload-status-text">Uploading...</p>
+                    </div>
+                </div>
+
+                <!-- Image Preview (hidden by default) -->
+                <div id="image-preview-container" class="hidden relative rounded-xl overflow-hidden border border-slate-100">
+                    <img id="image-preview" src="" alt="Preview" class="w-full object-cover max-h-64">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 hover:opacity-100 transition-all duration-200 flex items-end p-3">
+                        <button onclick="triggerImageInput()" class="text-[10px] font-bold text-white bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                            <i class="fa-solid fa-camera text-[9px]"></i> Change Image
+                        </button>
+                    </div>
+                </div>
+
+                <input type="file" id="image-file-input" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
+            </div>
+
+            <!-- Document Metadata Card -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-circle-info text-slate-400 text-sm"></i>
+                    <h3 class="text-sm font-extrabold text-slate-800">Metadata</h3>
+                </div>
+                <div class="flex flex-col gap-3" id="metadata-container"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="page-error" class="hidden flex flex-col items-center justify-center py-24 gap-4 text-slate-400">
+        <i class="fa-solid fa-triangle-exclamation text-4xl text-rose-300"></i>
+        <p class="text-sm font-bold text-slate-500" id="error-msg">Failed to load document.</p>
+        <a href="/admin" class="text-xs font-bold text-blue-500 hover:underline">← Back to Console</a>
+    </div>
+
+</main>
+
+<script>
+    const DOC_ID = "{{ doc_id }}";
+    const SANITY_PROJECT_ID = "{{ sanity_project_id }}";
+    const SANITY_DATASET = "{{ sanity_dataset }}";
+
+    const FIELD_SCHEMAS = {
+        product: [
+            { name:'name', label:'Product Name', type:'text', required:true },
+            { name:'price', label:'Price (PHP)', type:'number', step:'0.01' },
+            { name:'availability', label:'Availability', type:'select', options:[{value:'true',label:'In Stock'},{value:'false',label:'Out of Stock'}] },
+            { name:'category', label:'Category', type:'category_select', required:true },
+            { name:'subCategory', label:'Sub-Category', type:'subcategory_select', required:true },
+            { name:'strength', label:'Strength', type:'text', placeholder:'e.g. 400 mg' },
+            { name:'packaging', label:'Packaging', type:'text', placeholder:'e.g. Box of 10 Tablets' },
+            { name:'description', label:'Description', type:'textarea' },
+        ],
+        category: [
+            { name:'title', label:'Category Title', type:'text', required:true },
+            { name:'subtitle', label:'Subtitle', type:'text' },
+            { name:'description', label:'Description', type:'textarea' },
+            { name:'icon', label:'Icon Class (FontAwesome)', type:'text', placeholder:'e.g. fa-heart-pulse' },
+            { name:'subCategories', label:'Sub-Categories (comma separated)', type:'text', placeholder:'e.g. Breast Cancer, Ovarian Cancer, Lung Cancer' },
+        ],
+        heroSlide: [
+            { name:'title', label:'Slide Title', type:'text', required:true },
+            { name:'subtitle', label:'Subtitle', type:'textarea' },
+            { name:'primaryButtonText', label:'Primary Button Text', type:'text' },
+            { name:'primaryButtonLink', label:'Primary Button Link', type:'text' },
+            { name:'secondaryButtonText', label:'Secondary Button Text', type:'text' },
+            { name:'secondaryButtonLink', label:'Secondary Button Link', type:'text' },
+        ],
+        service: [
+            { name:'title', label:'Service Title', type:'text', required:true },
+            { name:'description', label:'Description', type:'textarea' },
+            { name:'icon', label:'Icon Class', type:'text', placeholder:'e.g. fa-truck-medical' },
+            { name:'link', label:'Redirect URL', type:'text' },
+        ],
+        dealOfDay: [
+            { name:'subtitle', label:'Deal Subtitle', type:'text' },
+            { name:'backgroundText', label:'Background Text', type:'text' },
+            { name:'priceOverride', label:'Price Override (PHP)', type:'number', step:'0.01' },
+        ],
+        categoryBanner: [
+            { name:'title', label:'Banner Title', type:'text', required:true },
+            { name:'subtitle', label:'Subtitle', type:'text' },
+            { name:'buttonText', label:'Button Text', type:'text' },
+            { name:'buttonLink', label:'Button Link', type:'text' },
+        ],
+        team: [
+            { name:'name', label:'Full Name', type:'text', required:true },
+            { name:'role', label:'Role / Title', type:'text' },
+            { name:'bio', label:'Bio', type:'textarea' },
+        ],
+        faq: [
+            { name:'question', label:'Question', type:'text', required:true },
+            { name:'answer', label:'Answer', type:'textarea', required:true },
+            { name:'keywords', label:'Keywords (comma separated)', type:'text' },
+        ],
+        chatSession: [
+            { name:'sessionId', label:'Session ID', type:'text' },
+            { name:'userName', label:'User Name', type:'text' },
+            { name:'lastSubject', label:'Last Subject', type:'text' },
+            { name:'sessionSummary', label:'Session Summary', type:'textarea' },
+        ],
+        adminUser: [
+            { name:'username', label:'Username', type:'text', required:true },
+            { name:'role', label:'Role', type:'text', required:true },
+            { name:'permissions', label:'Permissions (comma separated)', type:'text', required:true },
+            { name:'status', label:'Status', type:'select', options:[{value:'Active',label:'Active'},{value:'Suspended',label:'Suspended'}] },
+            { name:'passcode', label:'Passcode', type:'text', required:true }
+        ],
+        accessPoint: [
+            { name:'resource', label:'Resource / Path', type:'text', required:true },
+            { name:'allowed_roles', label:'Allowed Roles', type:'text', required:true },
+            { name:'auth_type', label:'Auth Type', type:'text', required:true }
+        ]
+    };
+
+    const COLLECTION_META = {
+        product:'Products', category:'Categories', heroSlide:'Hero Slides',
+        service:'Services', dealOfDay:'Deals', categoryBanner:'Banners',
+        team:'Team Members', faq:'FAQs', chatSession:'Chat Sessions',
+        adminUser:'Admin Users', accessPoint:'Access Policies'
+    };
+
+    const IMAGE_COLLECTIONS = ['product','category','heroSlide','team','categoryBanner'];
+
+    let currentDoc = null;
+    let adminToken = '';
+
+    // ---- INIT ----
+    window.addEventListener('DOMContentLoaded', async () => {
+        const session = localStorage.getItem('getmeds_admin_session');
+        if (session) {
+            try { adminToken = JSON.parse(session).token || 'getmeds-admin-secret-key'; }
+            catch(e) { adminToken = 'getmeds-admin-secret-key'; }
+        } else { adminToken = 'getmeds-admin-secret-key'; }
+
+        await loadDocument();
+    });
+
+    let fetchedCategories = [];
+
+    async function fetchCategories() {
+        try {
+            const res = await fetch(`/api/admin/documents?collection=category&page=1&limit=100`, {
+                headers: { 'X-Admin-Token': adminToken }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                fetchedCategories = data.documents || [];
+            }
+        } catch(e) {
+            console.error('Failed to load categories', e);
+        }
+    }
+
+    async function loadDocument() {
+        try {
+            const res = await fetch(`/api/admin/document/${DOC_ID}`, {
+                headers: { 'X-Admin-Token': adminToken }
+            });
+            if (!res.ok) throw new Error(`${res.status}: ${(await res.json()).detail}`);
+            const data = await res.json();
+            currentDoc = data.document;
+            
+            if (currentDoc._type === 'product') {
+                await fetchCategories();
+            }
+            
+            renderPage(currentDoc);
+        } catch(e) {
+            document.getElementById('page-skeleton').classList.add('hidden');
+            document.getElementById('page-error').classList.remove('hidden');
+            document.getElementById('error-msg').textContent = e.message;
+        }
+    }
+
+    function renderPage(doc) {
+        const type = doc._type;
+        const collectionLabel = COLLECTION_META[type] || type;
+        const primaryLabel = doc.name || doc.title || doc.question || doc.sessionId || doc._id;
+
+        // Update nav
+        document.getElementById('nav-collection').textContent = collectionLabel;
+        document.getElementById('nav-collection').onclick = () => window.location.href = `/admin?collection=${type}`;
+        document.getElementById('nav-doc-title').textContent = primaryLabel;
+        document.title = `${primaryLabel} — GetMEDS Console`;
+
+        // Type badge
+        const badge = document.getElementById('header-type-badge');
+        badge.textContent = collectionLabel;
+
+        // Render fields
+        const fields = FIELD_SCHEMAS[type] || [];
+        const container = document.getElementById('fields-container');
+        container.innerHTML = fields.map(f => renderField(f, doc[f.name])).join('');
+
+        if (type === 'product') {
+            const catSelect = document.getElementById('product-category-select');
+            if (catSelect) {
+                catSelect.addEventListener('change', (e) => {
+                    const catId = e.target.value;
+                    const subSelect = document.getElementById('product-subcategory-select');
+                    if (!subSelect) return;
+                    
+                    if (!catId) {
+                        subSelect.innerHTML = '<option value="">— Select a Category first —</option>';
+                        subSelect.disabled = true;
+                        return;
+                    }
+                    
+                    const selectedCat = fetchedCategories.find(c => c._id === catId);
+                    const subs = selectedCat?.subCategories || [];
+                    
+                    if (subs.length === 0) {
+                        subSelect.innerHTML = '<option value="">— No sub-categories available —</option>';
+                        subSelect.disabled = false;
+                    } else {
+                        subSelect.innerHTML = '<option value="">— Select a Sub-Category —</option>' +
+                            subs.map(s => `<option value="${s}">${escHtml(s)}</option>`).join('');
+                        subSelect.disabled = false;
+                    }
+                });
+            }
+        }
+
+        // Metadata
+        document.getElementById('metadata-container').innerHTML = [
+            { label:'Document ID', value:`<span class="font-mono text-[10px] text-slate-700 break-all">${doc._id}</span>` },
+            { label:'Type', value:`<span class="text-xs font-semibold text-slate-700">${doc._type}</span>` },
+            { label:'Created', value:`<span class="text-xs text-slate-600">${formatDate(doc._createdAt)}</span>` },
+            { label:'Updated', value:`<span class="text-xs text-slate-600">${formatDate(doc._updatedAt)}</span>` },
+        ].map(m => `
+            <div class="flex flex-col gap-0.5 border-b border-slate-50 pb-2.5">
+                <span class="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">${m.label}</span>
+                <div>${m.value}</div>
+            </div>`
+        ).join('');
+
+        // Image section
+        const hasImageSupport = IMAGE_COLLECTIONS.includes(type);
+        if (!hasImageSupport) {
+            document.getElementById('image-card').classList.add('hidden');
+        } else if (doc.image && doc.image.asset && doc.image.asset._ref) {
+            showImagePreview(buildSanityImageUrl(doc.image.asset._ref));
+        }
+
+        // Show content
+        document.getElementById('page-skeleton').classList.add('hidden');
+        document.getElementById('page-content').classList.remove('hidden');
+        document.getElementById('page-content').style.display = 'grid';
+    }
+
+    function renderField(field, value) {
+        const req = field.required ? '<span class="text-rose-400 ml-0.5">*</span>' : '';
+        const base = 'w-full border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-700 bg-white transition';
+
+        let input = '';
+        if (field.type === 'textarea') {
+            input = `<textarea name="${field.name}" rows="4" class="${base} resize-none" placeholder="${field.placeholder||''}">${escHtml(String(value??''))}</textarea>`;
+        } else if (field.type === 'select') {
+            const opts = field.options.map(o => `<option value="${o.value}" ${String(value)===o.value?'selected':''}>${o.label}</option>`).join('');
+            input = `<select name="${field.name}" class="${base}">${opts}</select>`;
+        } else if (field.type === 'category_select') {
+            const selectedCatId = value?._ref || value || '';
+            const catSelectOpts = fetchedCategories.map(c => 
+                `<option value="${c._id}" ${c._id === selectedCatId ? 'selected' : ''}>${escHtml(c.title)}</option>`
+            ).join('');
+            input = `<select name="${field.name}" id="product-category-select" class="${base}">
+                <option value="">— Select a Category —</option>
+                ${catSelectOpts}
+            </select>`;
+        } else if (field.type === 'subcategory_select') {
+            const activeCatId = currentDoc.category?._ref || currentDoc.category || '';
+            const activeCat = fetchedCategories.find(c => c._id === activeCatId);
+            const subs = activeCat?.subCategories || [];
+            const subSelectOpts = subs.map(s => 
+                `<option value="${s}" ${s === value ? 'selected' : ''}>${escHtml(s)}</option>`
+            ).join('');
+            const isDisabled = !activeCatId ? 'disabled' : '';
+            const defaultText = !activeCatId ? '— Select a Category first —' : '— Select a Sub-Category —';
+            input = `<select name="${field.name}" id="product-subcategory-select" ${isDisabled} class="${base}">
+                <option value="">${defaultText}</option>
+                ${subSelectOpts}
+            </select>`;
+        } else {
+            const stepAttr = field.step ? `step="${field.step}"` : '';
+            const displayVal = (field.name === 'subCategories' && Array.isArray(value)) ? value.join(', ') : (value ?? '');
+            input = `<input type="${field.type}" name="${field.name}" value="${escHtml(String(displayVal))}" ${field.required?'required':''} ${stepAttr} class="${base}" placeholder="${field.placeholder||''}">`;
+        }
+
+        return `<div class="flex flex-col gap-1.5">
+            <label class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">${field.label}${req}</label>
+            ${input}
+        </div>`;
+    }
+
+    // ---- SAVE ----
+    async function saveDocument() {
+        const btn = document.getElementById('btn-save');
+        setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Saving...');
+        GlobalLoader.start();
+
+        const fields = FIELD_SCHEMAS[currentDoc._type] || [];
+        const payload = {};
+        fields.forEach(f => {
+            const el = document.querySelector(`[name="${f.name}"]`);
+            if (!el) return;
+            if (f.name === 'availability') payload[f.name] = el.value === 'true';
+            else if (f.type === 'number') payload[f.name] = el.value !== '' ? parseFloat(el.value) : null;
+            else if (f.name === 'keywords' || f.name === 'subCategories') payload[f.name] = el.value.split(',').map(k=>k.trim()).filter(Boolean);
+            else if (f.type === 'category_select') payload[f.name] = el.value ? { _type: 'reference', _ref: el.value } : null;
+            else payload[f.name] = el.value;
+        });
+
+        try {
+            const res = await fetch(`/api/admin/document/${DOC_ID}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error((await res.json()).detail);
+            GlobalLoader.done();
+            showToast('Changes saved successfully!', 'success');
+        } catch(e) {
+            GlobalLoader.fail();
+            showToast(e.message || 'Failed to save.', 'error');
+        } finally {
+            setBtn(btn, false);
+        }
+    }
+
+    // ---- DELETE ----
+    async function deleteDocument() {
+        if (!await customConfirm({
+            title: 'Delete Document',
+            message: `Are you sure you want to delete "${currentDoc?.name || currentDoc?.title || DOC_ID}"? This action cannot be undone.`,
+            confirmText: 'Yes, Delete'
+        })) return;
+        const btn = document.getElementById('btn-delete');
+        setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Deleting...');
+        GlobalLoader.start();
+        try {
+            const res = await fetch(`/api/admin/document/${DOC_ID}`, {
+                method: 'DELETE', headers: { 'X-Admin-Token': adminToken }
+            });
+            if (!res.ok) throw new Error((await res.json()).detail);
+            GlobalLoader.done();
+            showToast('Document deleted. Redirecting...', 'success');
+            const targetCollection = (currentDoc._type === 'adminUser' || currentDoc._type === 'accessPoint') ? 'security' : currentDoc._type;
+            setTimeout(() => window.location.href = `/admin?collection=${targetCollection}`, 1200);
+            setBtn(btn, false);
+        } catch(e) {
+            GlobalLoader.fail();
+            showToast(e.message, 'error');
+            setBtn(btn, false);
+        }
+    }
+
+    // ---- IMAGE ----
+    function triggerImageInput() { document.getElementById('image-file-input').click(); }
+
+    function handleFileSelected(e) {
+        const file = e.target.files[0];
+        if (file) uploadImage(file);
+    }
+    function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('border-blue-400','bg-blue-50/50'); }
+    function handleDragLeave(e) { e.currentTarget.classList.remove('border-blue-400','bg-blue-50/50'); }
+    function handleDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('border-blue-400','bg-blue-50/50');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) uploadImage(file);
+    }
+
+    async function uploadImage(file) {
+        // Show local preview instantly
+        const localUrl = URL.createObjectURL(file);
+        showImagePreview(localUrl);
+
+        const progress = document.getElementById('upload-progress');
+        const bar = document.getElementById('progress-bar');
+        const statusText = document.getElementById('upload-status-text');
+        progress.classList.remove('hidden');
+        bar.style.width = '20%';
+        statusText.textContent = 'Uploading to Sanity...';
+        GlobalLoader.start();
+
+        try {
+            bar.style.width = '60%';
+            const res = await fetch(`/api/admin/document/${DOC_ID}/image`, {
+                method: 'POST',
+                headers: { 'Content-Type': file.type, 'X-Admin-Token': adminToken },
+                body: file
+            });
+            bar.style.width = '90%';
+            if (!res.ok) throw new Error((await res.json()).detail);
+            const data = await res.json();
+            bar.style.width = '100%';
+            statusText.textContent = 'Upload complete!';
+            GlobalLoader.done();
+            showToast('Image uploaded and saved!', 'success');
+            const cdnUrl = buildSanityImageUrl(data.assetRef);
+            if (cdnUrl) showImagePreview(cdnUrl);
+            setTimeout(() => { progress.classList.add('hidden'); bar.style.width='0%'; }, 1500);
+        } catch(e) {
+            progress.classList.add('hidden');
+            GlobalLoader.fail();
+            showToast(e.message || 'Image upload failed.', 'error');
+        }
+    }
+
+    function showImagePreview(url) {
+        const zone = document.getElementById('upload-zone');
+        const preview = document.getElementById('image-preview-container');
+        const img = document.getElementById('image-preview');
+        const replaceBtn = document.getElementById('replace-btn');
+
+        zone.classList.add('hidden');
+        img.src = url;
+        preview.classList.remove('hidden');
+        replaceBtn.classList.remove('hidden');
+    }
+
+    function buildSanityImageUrl(ref) {
+        if (!ref || !ref.startsWith('image-')) return null;
+        const withoutPrefix = ref.replace(/^image-/, '');
+        const lastDash = withoutPrefix.lastIndexOf('-');
+        const ext = withoutPrefix.substring(lastDash + 1);
+        const rest = withoutPrefix.substring(0, lastDash);
+        return `https://cdn.sanity.io/images/${SANITY_PROJECT_ID}/${SANITY_DATASET}/${rest}.${ext}`;
+    }
+
+    // ---- HELPERS ----
+    function formatDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function escHtml(v) {
+        return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Use global showToast, setBtn and GlobalLoader from head.html
+</script>
+</body>
+</html>
