@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Request
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 # pyrefly: ignore [missing-import]
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 # pyrefly: ignore [missing-import]
 from fastapi.templating import Jinja2Templates
 import os
@@ -81,11 +81,7 @@ async def serve_create_document(request: Request, collection: str):
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Welcome to the GetMEDS Chatbot API",
-        "docs": "/docs",
-        "admin": "/admin"
-    }
+    return RedirectResponse(url="/admin", status_code=302)
 
 if __name__ == "__main__":
     # pyrefly: ignore [missing-import]
