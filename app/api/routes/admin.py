@@ -74,15 +74,12 @@ async def verify_admin_token(request: Request, x_admin_token: str = Header(None,
     if not claims:
         raise HTTPException(status_code=401, detail="Expired or invalid admin session token.")
         
-    # Query Sanity to ensure operator is Active
-    from app.services.sanity_service import sanity_security_service
+    # Query Supabase PostgreSQL to ensure operator is Active
     username = claims["username"]
-    query = '*[_type == "adminUser" && username == $username][0]'
     try:
-        user = await sanity_security_service.query_sanity(query, {"$username": username})
-    except Exception:
-        # Security Sanity temporarily unreachable — allow access if token is structurally valid
-        print(f"WARNING: Security Sanity unreachable for token validation. Allowing access for {username}.")
+        user = await security_service.get_user_by_username(username)
+    except Exception as e:
+        print(f"WARNING: Supabase unreachable for token validation: {e}. Allowing access for {username}.")
         return
     
     if not user:
@@ -135,6 +132,99 @@ async def admin_auth_login(payload: LoginRequest, response: Response):
         "token": access_token
     }
 
+class GoogleSSORequest(BaseModel):
+    credential: str
+
+@router.post("/auth/google-sso")
+async def google_sso_auth(payload: GoogleSSORequest, response: Response):
+    """
+    Validates Google SSO JWT, checks permissions on Supabase, 
+    and issues secure admin session cookies.
+    """
+    # pyrefly: ignore [missing-import]
+    import httpx
+    try:
+        token = payload.credential
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            google_res = await client.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={token}")
+            
+        if google_res.status_code != 200:
+            raise HTTPException(status_code=401, detail="Invalid Google SSO token.")
+            
+        google_data = google_res.json()
+        email = google_data.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Google token does not contain email.")
+            
+        user = await security_service.get_user_by_username(email)
+        if not user:
+            await security_service.add_security_log(
+                event=f"Failed login attempt: Unauthorized Google email {email}",
+                user="Unknown",
+                ip_address="127.0.0.1",
+                status="FAILED",
+                severity="HIGH"
+            )
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Access Denied: Your Google account ({email}) is not authorized."
+            )
+            
+        if user.get("status") != "Active":
+            await security_service.add_security_log(
+                event=f"Blocked login attempt for suspended operator email: {email}",
+                user=user["username"],
+                ip_address="127.0.0.1",
+                status="FAILED",
+                severity="WARNING"
+            )
+            raise HTTPException(
+                status_code=403, 
+                detail="Access Blocked: Your administrative account is currently suspended."
+            )
+            
+        username = user["username"]
+        role = user["role"]
+        permissions = user["permissions"]
+        passcode = user["passcode"]
+        
+        await security_service.add_security_log(
+            event=f"Google SSO authentication successful for {username}",
+            user=username,
+            ip_address="127.0.0.1",
+            status="SUCCESS",
+            severity="INFO"
+        )
+        
+        access_token = generate_access_token(username, role, permissions)
+        refresh_token = generate_refresh_token(username, passcode)
+        
+        response.set_cookie(key="gmp_access_token", value=access_token, max_age=900, httponly=True, secure=False, samesite="lax")
+        response.set_cookie(key="gmp_refresh_token", value=refresh_token, max_age=604800, httponly=True, secure=False, samesite="lax")
+        
+        allowed = []
+        if role == 'Administrator':
+            allowed = ["product", "category", "faq", "chatSession", "heroSlide", "categoryBanner", "dealOfDay", "service", "team"]
+        elif role == 'Editor':
+            allowed = ["product", "category", "faq", "chatSession", "heroSlide", "categoryBanner", "dealOfDay", "service", "team"]
+        elif role == 'Security Officer':
+            allowed = []
+        else:
+            allowed = ["product", "category"]
+            
+        return {
+            "status": "success",
+            "username": username,
+            "role": role,
+            "permissions": permissions,
+            "allowedCollections": allowed,
+            "token": access_token
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SSO verification failed: {str(e)}")
+
 @router.post("/auth/refresh")
 async def admin_auth_refresh(request: Request, response: Response):
     """
@@ -153,9 +243,7 @@ async def admin_auth_refresh(request: Request, response: Response):
     username = claims["username"]
     passcode = claims["passcode"]
     
-    from app.services.sanity_service import sanity_security_service
-    query = '*[_type == "adminUser" && username == $username][0]'
-    user = await sanity_security_service.query_sanity(query, {"$username": username})
+    user = await security_service.get_user_by_username(username)
     
     if not user or user.get("passcode") != passcode or user.get("status") != "Active":
         response.delete_cookie("gmp_access_token")
@@ -592,18 +680,7 @@ async def get_security_logs(page: int = 1, limit: int = 5):
     Exposes a server-side paginated list of security audit logs.
     """
     try:
-        from app.services.sanity_service import sanity_security_service
-        
-        # 1. Fetch total count of security logs
-        count_query = 'count(*[_type == "securityLog"])'
-        total_count = await sanity_security_service.query_sanity(count_query)
-        
-        # 2. Query target paginated slice
-        start = (page - 1) * limit
-        end = page * limit
-        
-        groq_query = f'*[_type == "securityLog"] | order(timestamp desc) [{start}...{end}]'
-        results = await sanity_security_service.query_sanity(groq_query)
+        results, total_count = await security_service.get_security_logs_paginated(page, limit)
         
         return {
             "status": "success",
