@@ -23,7 +23,7 @@
             <div class="flex flex-col">
                 <h2 class="text-2xl font-extrabold text-slate-800 leading-tight">Access & Security Console</h2>
                 <div class="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span class="bg-[#D1FAE5] text-[#065F46] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-[#A7F3D0]/60 shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
+                    <span id="supabase-status-badge" class="bg-[#D1FAE5] text-[#065F46] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-[#A7F3D0]/60 shadow-[0_1px_1px_rgba(0,0,0,0.02)]">
                         <i class="fa-solid fa-database text-[9px]"></i> Supabase PostgreSQL Active
                     </span>
                     <span class="text-[10px] text-slate-400 font-medium">Supabase (admin_users, security_logs, access_points)</span>
@@ -85,21 +85,51 @@
             </div>
         </div>
 
-        <!-- Panel 2: Access Policies -->
-        <div id="sec-panel-policies" class="hidden flex flex-col gap-4 w-full">
-            <div class="overflow-x-auto w-full border border-slate-100 rounded-lg bg-white shadow-sm">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
-                            <th class="px-4 py-3">Resource / Path</th>
-                            <th class="px-4 py-3">Allowed Roles</th>
-                            <th class="px-4 py-3">Auth Type</th>
-                        </tr>
-                    </thead>
-                    <tbody id="security-access-list" class="text-xs text-slate-600 divide-y divide-slate-100/60">
-                        <!-- Access points populated dynamically -->
-                    </tbody>
-                </table>
+        <!-- Panel 2: RBAC Action Control (Access Policies) -->
+        <div id="sec-panel-policies" class="hidden flex flex-col gap-5 w-full">
+            <!-- Header row -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-700">Action Control — Role Permissions</h3>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Define what each role can do per collection. Users without access will have those sections hidden.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openAddRoleModal()" class="border border-slate-200 hover:bg-slate-50 text-slate-600 text-[10px] font-bold px-3 py-2 rounded-lg transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus text-[9px]"></i> Add Role
+                    </button>
+                    <button onclick="saveRbacMatrix()" id="rbac-save-btn" class="bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-save"></i> Save Permissions
+                    </button>
+                </div>
+            </div>
+
+            <!-- Role tabs -->
+            <div class="flex items-center gap-2 flex-wrap" id="rbac-role-tabs">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Per-role collection access table -->
+            <div class="border border-slate-100 rounded-xl bg-white shadow-sm overflow-hidden" id="rbac-role-panel-container">
+                <!-- Populated dynamically per selected role -->
+            </div>
+
+            <!-- Add Role Modal -->
+            <div id="add-role-modal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-extrabold text-slate-800">Add New Role</h4>
+                        <button onclick="closeAddRoleModal()" class="text-slate-400 hover:text-slate-700 transition"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Role Name</label>
+                        <input id="new-role-name-input" type="text" placeholder="e.g. Content Manager"
+                            class="border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 transition" />
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button onclick="closeAddRoleModal()" class="text-[10px] font-bold text-slate-500 px-4 py-2 rounded-lg hover:bg-slate-50 transition">Cancel</button>
+                        <button onclick="confirmAddRole()" class="bg-slate-900 text-white text-[10px] font-bold px-4 py-2 rounded-lg hover:bg-slate-700 transition">Add Role</button>
+                    </div>
+                </div>
             </div>
         </div>
 

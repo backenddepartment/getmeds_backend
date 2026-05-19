@@ -124,11 +124,25 @@ async def admin_auth_login(payload: LoginRequest, response: Response):
         samesite="lax"
     )
     
+    # Retrieve RBAC permissions to determine allowed collections
+    matrix = await security_service.get_role_permissions()
+    # v2 format: { role: { collection: [actions] } }
+    # v1 legacy: { collection: [roles] }
+    is_v2 = matrix and not any(isinstance(v, list) for v in matrix.values())
+    if is_v2:
+        role_perms = matrix.get(role, {})
+        allowed = [col for col, actions in role_perms.items() if 'read' in actions]
+    else:
+        allowed = [col for col, roles in matrix.items() if role in roles]
+        role_perms = {col: (['read', 'create', 'edit', 'delete'] if role in roles else ['read']) for col, roles in matrix.items()}
+
     return {
         "status": "success",
         "username": username,
         "role": role,
         "permissions": permissions,
+        "allowedCollections": allowed,
+        "roleActionPerms": role_perms,
         "token": access_token
     }
 
@@ -202,15 +216,15 @@ async def google_sso_auth(payload: GoogleSSORequest, response: Response):
         response.set_cookie(key="gmp_access_token", value=access_token, max_age=900, httponly=True, secure=False, samesite="lax")
         response.set_cookie(key="gmp_refresh_token", value=refresh_token, max_age=604800, httponly=True, secure=False, samesite="lax")
         
-        allowed = []
-        if role == 'Administrator':
-            allowed = ["product", "category", "faq", "chatSession", "heroSlide", "categoryBanner", "dealOfDay", "service", "team"]
-        elif role == 'Editor':
-            allowed = ["product", "category", "faq", "chatSession", "heroSlide", "categoryBanner", "dealOfDay", "service", "team"]
-        elif role == 'Security Officer':
-            allowed = []
+        # Retrieve RBAC permissions to determine allowed collections
+        matrix = await security_service.get_role_permissions()
+        is_v2 = matrix and not any(isinstance(v, list) for v in matrix.values())
+        if is_v2:
+            role_perms = matrix.get(role, {})
+            allowed = [col for col, actions in role_perms.items() if 'read' in actions]
         else:
-            allowed = ["product", "category"]
+            allowed = [col for col, roles in matrix.items() if role in roles]
+            role_perms = {col: (['read','create','edit','delete'] if role in roles else ['read']) for col, roles in matrix.items()}
             
         return {
             "status": "success",
@@ -218,6 +232,7 @@ async def google_sso_auth(payload: GoogleSSORequest, response: Response):
             "role": role,
             "permissions": permissions,
             "allowedCollections": allowed,
+            "roleActionPerms": role_perms,
             "token": access_token
         }
     except HTTPException:
@@ -256,9 +271,22 @@ async def admin_auth_refresh(request: Request, response: Response):
     response.set_cookie(key="gmp_access_token", value=new_access, max_age=900, httponly=True, secure=False, samesite="lax")
     response.set_cookie(key="gmp_refresh_token", value=new_refresh, max_age=604800, httponly=True, secure=False, samesite="lax")
     
+    # Retrieve RBAC permissions to determine allowed collections
+    matrix = await security_service.get_role_permissions()
+    role = user["role"]
+    is_v2 = matrix and not any(isinstance(v, list) for v in matrix.values())
+    if is_v2:
+        role_perms = matrix.get(role, {})
+        allowed = [col for col, actions in role_perms.items() if 'read' in actions]
+    else:
+        allowed = [col for col, roles in matrix.items() if role in roles]
+        role_perms = {col: (['read','create','edit','delete'] if role in roles else ['read']) for col, roles in matrix.items()}
+
     return {
         "status": "success",
-        "token": new_access
+        "token": new_access,
+        "allowedCollections": allowed,
+        "roleActionPerms": role_perms
     }
 
 @router.post("/auth/logout")
@@ -397,11 +425,17 @@ async def get_document_detail(doc_id: str):
     )
 
     try:
-        if _UUID_RE.match(doc_id) or doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            # Supabase UUID or legacy-prefixed security record
+        if _UUID_RE.match(doc_id) or doc_id.isdigit() or doc_id.startswith(("GMAU", "GMAP", "GMSL")):
+            # Supabase UUID, numeric ID, or legacy-prefixed security record
             result = await security_service.get_security_record_by_id(doc_id)
             if result is None:
                 raise HTTPException(status_code=404, detail=f"Security record '{doc_id}' not found in Supabase.")
+            
+            # Map table name to frontend UI _type for FIELD_SCHEMAS lookup
+            if result.get("_table") == "admin_users":
+                result["_type"] = "adminUser"
+            elif result.get("_table") == "access_points":
+                result["_type"] = "accessPoint"
         else:
             groq_query = f'*[_id == "{doc_id}"][0]'
             result = await sanity_service.query_sanity(groq_query)
@@ -419,18 +453,32 @@ async def get_document_detail(doc_id: str):
 async def update_document(doc_id: str, data: dict):
     """
     Patches specific fields of an existing document.
-    Security-prefixed IDs (GMAU/GMAP) update the Supabase admin_users or access_points table.
+    Security-prefixed IDs or Supabase UUIDs update the Supabase admin_users or access_points table.
     All other IDs patch Sanity CMS documents.
     """
     if not data:
         raise HTTPException(status_code=400, detail="No fields provided to update.")
+    
+    import re
+    _UUID_RE = re.compile(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        re.IGNORECASE
+    )
+
     try:
-        if doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            # Security records live in Supabase — update status if provided
-            new_status = data.get("status")
-            username = data.get("username") or doc_id
-            if new_status:
-                await security_service.update_user_status(username, new_status)
+        if _UUID_RE.match(doc_id) or doc_id.isdigit() or doc_id.startswith(("GMAU", "GMAP", "GMSL")):
+            # Supabase UUID, numeric ID, or legacy-prefixed security record
+            record = await security_service.get_security_record_by_id(doc_id)
+            if record is None:
+                raise HTTPException(status_code=404, detail="Security record not found in Supabase.")
+            
+            table = record.get("_table")
+            if table == "admin_users":
+                await security_service.update_admin_user(doc_id, data)
+            elif table == "access_points":
+                await security_service.update_access_point(doc_id, data)
+            else:
+                raise HTTPException(status_code=400, detail=f"Unsupported security record table update: {table}")
             return {"status": "success", "id": doc_id}
         else:
             for key in ("_id", "_type", "_rev", "_createdAt", "_updatedAt"):
@@ -498,13 +546,30 @@ async def upload_document_image(doc_id: str, request: Request):
 async def delete_document(doc_id: str):
     """
     Unified document deletion endpoint.
-    Security-prefixed IDs (GMAU/GMAP/GMSL) are not directly deleted from Supabase
-    for safety — suspend the user via the toggle instead.
+    Admin users cannot be deleted for safety. Access points can be deleted.
     """
+    import re
+    _UUID_RE = re.compile(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        re.IGNORECASE
+    )
+
     try:
-        if doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            # Safety: do not hard-delete Supabase security records via CMS panel
-            return {"status": "ignored", "id": doc_id, "detail": "Security records are managed in Supabase. Use Toggle to suspend."}
+        if _UUID_RE.match(doc_id) or doc_id.isdigit() or doc_id.startswith(("GMAU", "GMAP", "GMSL")):
+            # Supabase security record
+            record = await security_service.get_security_record_by_id(doc_id)
+            if not record:
+                raise HTTPException(status_code=404, detail="Security record not found in Supabase.")
+            
+            table = record.get("_table")
+            if table == "admin_users":
+                raise HTTPException(status_code=400, detail="Security admin users cannot be deleted. Use Toggle to suspend.")
+            elif table == "access_points":
+                await security_service.delete_security_record(doc_id)
+                return {"status": "success", "id": doc_id}
+            else:
+                raise HTTPException(status_code=400, detail=f"Deletion not supported for security table: {table}")
+        
         mutations = [{"delete": {"id": doc_id}}]
         result = await sanity_service.mutate_sanity(mutations)
         return {"status": "success", "id": doc_id, "result": result}
@@ -732,6 +797,44 @@ async def update_user_status(payload: dict):
         raise HTTPException(status_code=400, detail="Missing username or status in payload")
     try:
         await security_service.update_user_status(username, status)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/security/role-permissions", dependencies=[Depends(verify_admin_token)])
+async def get_role_permissions():
+    """
+    Returns the full RBAC permission matrix (v2 format):
+      - roles: distinct role names from admin_users
+      - permissions: { role: { collection: [actions] } }
+    """
+    try:
+        roles = await security_service.get_distinct_roles()
+        permissions = await security_service.get_role_permissions()
+        return {"status": "success", "roles": roles, "permissions": permissions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/security/role-permissions", dependencies=[Depends(verify_admin_token)])
+async def save_role_permissions(payload: dict):
+    """
+    Saves the full RBAC permission matrix atomically.
+    Payload v2: { permissions: { role: { collection: [actions] } }, format: 'v2' }
+    Payload legacy: { permissions: { collection: [roles] } }
+    """
+    permissions = payload.get("permissions")
+    fmt = payload.get("format", "legacy")
+    if not permissions or not isinstance(permissions, dict):
+        raise HTTPException(status_code=400, detail="Missing or invalid permissions payload.")
+    try:
+        await security_service.save_role_permissions(permissions, fmt)
+        await security_service.add_security_log(
+            event="RBAC Action Control permissions matrix updated",
+            user="System Admin",
+            ip_address="127.0.0.1",
+            status="SUCCESS",
+            severity="WARNING"
+        )
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

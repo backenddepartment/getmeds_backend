@@ -23,6 +23,11 @@
         chatSession: { label: 'Chat Sessions', icon: 'fa-comments', badge: 'bg-slate-50 text-slate-600 border-slate-100/50' },
     };
 
+    // Special system sections outside COLLECTION_META (not DB collections)
+    const SYSTEM_SECTION_META = {
+        _security: { label: 'Access & Security', icon: 'fa-shield-halved', note: 'Read = can open panel · Create = manage users · Edit = edit policies · Delete = delete users/logs' }
+    };
+
     // Per-collection column definitions: key=field name, label=header, type=render hint
     const TABLE_SCHEMAS = {
         product:       [{ key:'name', label:'Name' }, { key:'description', label:'Description', truncate:true }, { key:'price', label:'Price', type:'price' }, { key:'availability', label:'Stock', type:'availability' }, { key:'subCategory', label:'Sub-Category' }],
@@ -385,8 +390,21 @@
         const nav = document.getElementById('sidebar-menu-nav');
         if (!nav) return;
 
+        let allowedCollections = [];
+        let roleActionPerms = null;
+        try {
+            const session = JSON.parse(localStorage.getItem('getmeds_admin_session') || '{}');
+            allowedCollections = session.allowedCollections || [];
+            roleActionPerms = session.roleActionPerms || null;
+            // Security Officer — no content collections
+            if (session.role === 'Security Officer') allowedCollections = [];
+        } catch(e) {}
+
         let html = ``;
         Object.keys(COLLECTION_META).forEach(key => {
+            // RBAC Enforcement: Hide collection if role doesn't have at least read access
+            if (allowedCollections.length > 0 && !allowedCollections.includes(key)) return;
+
             const meta = COLLECTION_META[key];
             const isActive = activeFilter === key;
 
@@ -404,6 +422,11 @@
             `;
         });
         nav.innerHTML = html;
+
+        // Apply action-level enforcement for current collection
+        if (roleActionPerms) {
+            applyActionControlEnforcement(roleActionPerms);
+        }
     }
 
     function setActiveFilter(filterKey) {
@@ -435,6 +458,12 @@
 
         syncUrlToState();
         refreshAdminDashboard();
+
+        // Apply action-level RBAC enforcement for new collection
+        try {
+            const session = JSON.parse(localStorage.getItem('getmeds_admin_session') || '{}');
+            if (session.roleActionPerms) applyActionControlEnforcement(session.roleActionPerms);
+        } catch(e) {}
     }
 
     function renderTableHeaders(collection) {
@@ -710,7 +739,7 @@
         feed.innerHTML = html;
     }
 
-    function switchSecurityTab(tabName) {
+    function switchSecurityTab(tabName, skipUrl = false) {
         activeSecurityTab = tabName;
         currentSecurityPage = 1; // Reset page on tab switch
 
@@ -735,11 +764,25 @@
         // Show active panel
         document.getElementById(`sec-panel-${tabName}`).classList.remove('hidden');
 
+        // Update URL to match state
+        if (!skipUrl) syncUrlToState();
+
         // Fetch only the active tab's data
         refreshSecurityDashboard();
     }
 
-    function showSecurityControlPanel(skipUrl = false) {
+    function showSecurityControlPanel(skipUrl = false, defaultTab = null) {
+        // Check _security read permission
+        try {
+            const session = JSON.parse(localStorage.getItem('getmeds_admin_session') || '{}');
+            const secActions = (session.roleActionPerms || {})['_security'] || [];
+            // If roleActionPerms is set and _security read is not granted, block access
+            if (session.roleActionPerms && !secActions.includes('read')) {
+                showToast('Access denied — your role does not have permission to view Security.', 'error');
+                return;
+            }
+        } catch(e) {}
+
         activeFilter = 'security';
         if (!skipUrl) syncUrlToState();
 
@@ -761,7 +804,9 @@
             a.classList.add('text-slate-500');
         });
 
-        switchSecurityTab('users');
+        // Use defaultTab if provided, or current activeSecurityTab, or default to 'users'
+        const tabToUse = defaultTab || activeSecurityTab || 'users';
+        switchSecurityTab(tabToUse, true);
     }
 
     function hideSecurityControlPanel(skipUrl = false) {
@@ -784,14 +829,22 @@
                     loadedSecurityUsers = await usersRes.json();
                     renderSecurityUsers();
                     updateSecurityStats();
+                    setSupabaseBadgeActive();
+                } else {
+                    const errText = await usersRes.text();
+                    throw new Error(errText || `Server returned status ${usersRes.status}`);
                 }
             } else if (activeSecurityTab === 'policies') {
-                renderSecurityAccessSkeleton();
-                const accessRes = await fetch('/api/admin/security/access', { headers: { 'X-Admin-Token': token } });
+                const container = document.getElementById('rbac-role-panel-container');
+                if (container) container.innerHTML = '<div class="text-center py-12 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></div>';
+                const accessRes = await fetch('/api/admin/security/role-permissions', { headers: { 'X-Admin-Token': token } });
                 if (accessRes.ok) {
-                    loadedSecurityAccess = await accessRes.json();
-                    renderSecurityAccess();
-                    updateSecurityStats();
+                    const data = await accessRes.json();
+                    renderRbacMatrix(data);
+                    setSupabaseBadgeActive();
+                } else {
+                    const errText = await accessRes.text();
+                    throw new Error(errText || `Server returned status ${accessRes.status}`);
                 }
             } else if (activeSecurityTab === 'logs') {
                 renderSecurityLogsSkeleton();
@@ -802,11 +855,112 @@
                     totalSecurityLogs = data.total || 0;
                     renderSecurityLogs();
                     renderSecurityLogsPagination();
+                    setSupabaseBadgeActive();
+                } else {
+                    const errText = await logsRes.text();
+                    throw new Error(errText || `Server returned status ${logsRes.status}`);
                 }
             }
         } catch (err) {
             console.error('Failed to load security dashboard:', err);
+            setSupabaseBadgeError(err.message || err);
+            
+            // Render nice error states in the DOM container
+            if (activeSecurityTab === 'users') {
+                renderSecurityUsersError(err.message || err);
+            } else if (activeSecurityTab === 'policies') {
+                renderRbacMatrixError(err.message || err);
+            } else if (activeSecurityTab === 'logs') {
+                renderSecurityLogsError(err.message || err);
+            }
         }
+    }
+
+    function setSupabaseBadgeActive() {
+        const badge = document.getElementById('supabase-status-badge');
+        if (badge) {
+            badge.className = "bg-[#D1FAE5] text-[#065F46] text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-[#A7F3D0]/60 shadow-[0_1px_1px_rgba(0,0,0,0.02)]";
+            badge.innerHTML = '<i class="fa-solid fa-database text-[9px]"></i> Supabase PostgreSQL Active';
+        }
+    }
+
+    function setSupabaseBadgeError(msg) {
+        const badge = document.getElementById('supabase-status-badge');
+        if (badge) {
+            badge.className = "bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-rose-300/60 shadow-[0_1px_1px_rgba(0,0,0,0.02)]";
+            badge.innerHTML = '<i class="fa-solid fa-circle-exclamation text-[9px]"></i> Supabase Connection Failed';
+            badge.title = msg;
+        }
+    }
+
+    function renderSecurityUsersError(err) {
+        const list = document.getElementById('security-users-list');
+        if (list) {
+            list.innerHTML = `
+                <tr>
+                    <td colspan="5" class="px-6 py-12 text-center">
+                        <div class="flex flex-col items-center justify-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 shadow-inner">
+                                <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                            </div>
+                            <div class="flex flex-col gap-1 max-w-md mx-auto">
+                                <h4 class="text-sm font-bold text-slate-800">Database Connection Failed</h4>
+                                <p class="text-xs text-slate-500 leading-normal">
+                                    We encountered an error connecting to the Supabase PostgreSQL database. Please verify the <code class="bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-mono text-[10px]">DATABASE_URL</code> variable in your <code class="bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-mono text-[10px]">.env</code> file.
+                                </p>
+                                <span class="text-[10px] text-rose-500 font-mono mt-1 select-all break-all border border-rose-100 bg-rose-50/50 p-2 rounded text-center">${err}</span>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function renderRbacMatrixError(err) {
+        const container = document.getElementById('rbac-role-panel-container');
+        if (container) {
+            container.innerHTML = `
+                <div class="p-8 text-center flex flex-col items-center justify-center gap-3 bg-white rounded-xl border border-slate-100">
+                    <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 shadow-inner">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <div class="flex flex-col gap-1 max-w-md mx-auto">
+                        <h4 class="text-sm font-bold text-slate-800">Access Policies Unavailable</h4>
+                        <p class="text-xs text-slate-500 leading-normal">
+                            Failed to fetch role-based permissions from Supabase. Ensure your database connection settings are correct and tables are fully initialized.
+                        </p>
+                        <span class="text-[10px] text-rose-500 font-mono mt-1 select-all break-all border border-rose-100 bg-rose-50/50 p-2 rounded text-center">${err}</span>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function renderSecurityLogsError(err) {
+        const feed = document.getElementById('security-logs-feed');
+        if (feed) {
+            feed.innerHTML = `
+                <div class="p-8 text-center flex flex-col items-center justify-center gap-3 bg-white rounded-xl border border-slate-100">
+                    <div class="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 shadow-inner">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <div class="flex flex-col gap-1 max-w-md mx-auto">
+                        <h4 class="text-sm font-bold text-slate-800">Audit Logs Offline</h4>
+                        <p class="text-xs text-slate-500 leading-normal">
+                            The security audit logs could not be retrieved from the database. Please check your network connection or backend configuration.
+                        </p>
+                        <span class="text-[10px] text-rose-500 font-mono mt-1 select-all break-all border border-rose-100 bg-rose-50/50 p-2 rounded text-center">${err}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Hide/reset pagination
+        const info = document.getElementById('sec-pagination-info');
+        if (info) info.innerText = 'Showing 0 to 0 of 0 entries';
+        const pages = document.getElementById('sec-pagination-pages');
+        if (pages) pages.innerHTML = '';
     }
 
     function updateSecurityStats() {
@@ -846,20 +1000,337 @@
         }
     }
 
-    function renderSecurityAccess() {
-        const tbody = document.getElementById('security-access-list');
-        if (!tbody) return;
+    // ============================================================
+    //  ACTION CONTROL — ROLE-BASED PERMISSION MATRIX
+    //  Format: { role: { collection: ['read','create','edit','delete'] } }
+    // ============================================================
 
-        if (loadedSecurityAccess.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-400 font-bold">No policies configured.</td></tr>';
+    const RBAC_ACTIONS = ['read', 'create', 'edit', 'delete'];
+    const RBAC_ACTION_LABELS = { read: 'Read', create: 'Create', edit: 'Edit', delete: 'Delete' };
+    const RBAC_ACTION_COLORS = { read: 'text-sky-600', create: 'text-emerald-600', edit: 'text-amber-600', delete: 'text-rose-600' };
+
+    let currentRbacData = null;
+    let activeRbacRole = null;
+    // localRbacPerms: { role: { collection: { read:bool, create:bool, edit:bool, delete:bool } } }
+    let localRbacPerms = {};
+    // localRbacRoles: string[] — tracks all roles including newly added ones
+    let localRbacRoles = [];
+
+    function renderRbacMatrix(data) {
+        currentRbacData = data;
+        const roles = data.roles || [];
+        // data.permissions new format: { role: { collection: [actions] } }
+        // Also support legacy format: { collection: [roles] }
+        const rawPerms = data.permissions || {};
+
+        // Detect legacy format: if any value is an array of strings (not objects), it's legacy
+        const isLegacy = Object.values(rawPerms).some(v => Array.isArray(v));
+
+        localRbacRoles = [...roles];
+        localRbacPerms = {};
+
+        const allPermKeys = [...Object.keys(COLLECTION_META), ...Object.keys(SYSTEM_SECTION_META)];
+
+        if (isLegacy) {
+            // Migrate: legacy { collection: [roles_with_write_access] } → new format
+            // Give legacy write-roles: read+create+edit+delete; others: read only
+            roles.forEach(role => {
+                localRbacPerms[role] = {};
+                allPermKeys.forEach(col => {
+                    const hasWrite = (rawPerms[col] || []).includes(role);
+                    // For _security in legacy, only give to roles that previously had write access
+                    localRbacPerms[role][col] = {
+                        read: true,
+                        create: hasWrite,
+                        edit: hasWrite,
+                        delete: hasWrite
+                    };
+                });
+            });
         } else {
-            tbody.innerHTML = loadedSecurityAccess.map(policy => `
-                <tr class="hover:bg-slate-50/50 transition cursor-pointer" onclick="openDocumentDetail('${policy._id}')">
-                    <td class="px-4 py-3.5 font-mono text-[10px] text-slate-600 font-bold">${escapeHtml(policy.resource)}</td>
-                    <td class="px-4 py-3.5 font-semibold text-slate-500">${escapeHtml(policy.allowed_roles)}</td>
-                    <td class="px-4 py-3.5 text-slate-400 font-medium">${escapeHtml(policy.auth_type)}</td>
-                </tr>
-            `).join('');
+            roles.forEach(role => {
+                localRbacPerms[role] = {};
+                allPermKeys.forEach(col => {
+                    const actions = (rawPerms[role] || {})[col] || [];
+                    localRbacPerms[role][col] = {
+                        read: actions.includes('read'),
+                        create: actions.includes('create'),
+                        edit: actions.includes('edit'),
+                        delete: actions.includes('delete')
+                    };
+                });
+            });
+        }
+
+        // Set default active role
+        if (!activeRbacRole || !localRbacRoles.includes(activeRbacRole)) {
+            activeRbacRole = localRbacRoles[0] || null;
+        }
+
+        renderRbacRoleTabs();
+        renderRbacRolePanel();
+    }
+
+    function renderRbacRoleTabs() {
+        const container = document.getElementById('rbac-role-tabs');
+        if (!container) return;
+
+        let html = '';
+        localRbacRoles.forEach(role => {
+            const isActive = role === activeRbacRole;
+            html += `
+                <div class="group flex items-center gap-1">
+                    <button onclick="switchRbacRole('${escapeHtml(role)}')"
+                        class="px-4 py-2 rounded-lg text-[11px] font-bold transition border ${
+                            isActive
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-800'
+                        }">
+                        <i class="fa-solid fa-user-shield text-[9px] mr-1.5 opacity-70"></i>${escapeHtml(role)}
+                    </button>
+                    <button onclick="deleteRbacRole('${escapeHtml(role)}')" title="Delete role"
+                        class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition text-[10px] px-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function switchRbacRole(role) {
+        activeRbacRole = role;
+        renderRbacRoleTabs();
+        renderRbacRolePanel();
+    }
+
+    function renderRbacRolePanel() {
+        const container = document.getElementById('rbac-role-panel-container');
+        if (!container) return;
+
+        if (!activeRbacRole) {
+            container.innerHTML = `<div class="flex flex-col items-center justify-center py-16 text-slate-300">
+                <i class="fa-solid fa-user-shield text-4xl mb-3"></i>
+                <p class="text-xs font-bold">No roles configured. Add a role to get started.</p>
+            </div>`;
+            return;
+        }
+
+        const rolePerms = localRbacPerms[activeRbacRole] || {};
+        // Build all sections: DB collections + system sections
+        const allSections = [
+            ...Object.keys(COLLECTION_META).map(col => ({ key: col, ...COLLECTION_META[col], isSystem: false })),
+            ...Object.entries(SYSTEM_SECTION_META).map(([k, v]) => ({ key: k, ...v, isSystem: true }))
+        ];
+
+        let html = `
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-user-shield text-slate-400"></i>
+                    <span class="text-xs font-extrabold text-slate-700">${escapeHtml(activeRbacRole)}</span>
+                    <span class="text-[9px] text-slate-400 font-semibold">— access policy</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    ${RBAC_ACTIONS.map(a => `
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider ${RBAC_ACTION_COLORS[a]}">${RBAC_ACTION_LABELS[a]}</span>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="divide-y divide-slate-100/80">`;
+
+        let lastWasSystem = false;
+        allSections.forEach(section => {
+            const { key, label, icon, note, isSystem } = section;
+
+            // Divider before system sections
+            if (isSystem && !lastWasSystem) {
+                html += `<div class="px-5 py-2 bg-amber-50/60 border-y border-amber-100 flex items-center gap-2">
+                    <i class="fa-solid fa-lock text-amber-400 text-[10px]"></i>
+                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-amber-600">System Sections</span>
+                </div>`;
+            }
+            lastWasSystem = isSystem;
+
+            const colPerms = rolePerms[key] || { read: false, create: false, edit: false, delete: false };
+
+            html += `
+                <div class="flex items-center justify-between px-5 py-3 hover:bg-slate-50/40 transition ${isSystem ? 'bg-amber-50/20' : ''}">
+                    <div class="flex items-start gap-2.5 min-w-[200px]">
+                        <i class="fa-solid ${icon} ${isSystem ? 'text-amber-400' : 'text-slate-300'} text-xs w-4 text-center mt-0.5"></i>
+                        <div>
+                            <span class="text-xs font-semibold ${isSystem ? 'text-amber-700' : 'text-slate-700'}">${label}</span>
+                            ${note ? `<p class="text-[9px] text-slate-400 font-medium mt-0.5 max-w-[280px]">${note}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        ${RBAC_ACTIONS.map(action => `
+                            <div class="flex flex-col items-center gap-1 w-[52px]">
+                                <input type="checkbox"
+                                    data-role="${escapeHtml(activeRbacRole)}"
+                                    data-collection="${key}"
+                                    data-action="${action}"
+                                    class="rbac-checkbox w-4 h-4 cursor-pointer rounded border-slate-300 focus:ring-2 focus:ring-slate-300 transition
+                                        ${action === 'read' ? 'accent-sky-500' : action === 'create' ? 'accent-emerald-500' : action === 'edit' ? 'accent-amber-500' : 'accent-rose-500'}"
+                                    onchange="onRbacCheckboxChange(this)"
+                                    ${colPerms[action] ? 'checked' : ''}>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+
+    function onRbacCheckboxChange(cb) {
+        const role = cb.getAttribute('data-role');
+        const col = cb.getAttribute('data-collection');
+        const action = cb.getAttribute('data-action');
+        if (!localRbacPerms[role]) localRbacPerms[role] = {};
+        if (!localRbacPerms[role][col]) localRbacPerms[role][col] = { read: false, create: false, edit: false, delete: false };
+        localRbacPerms[role][col][action] = cb.checked;
+
+        // If any write action is checked, auto-check read
+        if ((action === 'create' || action === 'edit' || action === 'delete') && cb.checked) {
+            localRbacPerms[role][col]['read'] = true;
+            const readCb = document.querySelector(`input[data-role="${CSS.escape(role)}"][data-collection="${col}"][data-action="read"]`);
+            if (readCb) readCb.checked = true;
+        }
+    }
+
+    function openAddRoleModal() {
+        document.getElementById('add-role-modal').classList.remove('hidden');
+        document.getElementById('new-role-name-input').value = '';
+        setTimeout(() => document.getElementById('new-role-name-input').focus(), 100);
+    }
+
+    function closeAddRoleModal() {
+        document.getElementById('add-role-modal').classList.add('hidden');
+    }
+
+    function confirmAddRole() {
+        const input = document.getElementById('new-role-name-input');
+        const name = input.value.trim();
+        if (!name) { showToast('Role name is required.', 'error'); return; }
+        if (localRbacRoles.includes(name)) { showToast('Role already exists.', 'error'); return; }
+
+        localRbacRoles.push(name);
+        localRbacPerms[name] = {};
+        [...Object.keys(COLLECTION_META), ...Object.keys(SYSTEM_SECTION_META)].forEach(col => {
+            localRbacPerms[name][col] = { read: false, create: false, edit: false, delete: false };
+        });
+
+        activeRbacRole = name;
+        closeAddRoleModal();
+        renderRbacRoleTabs();
+        renderRbacRolePanel();
+        showToast(`Role "${name}" added. Configure permissions and save.`, 'success');
+    }
+
+    function deleteRbacRole(role) {
+        if (!confirm(`Delete role "${role}"? All its permissions will be removed.`)) return;
+        localRbacRoles = localRbacRoles.filter(r => r !== role);
+        delete localRbacPerms[role];
+        if (activeRbacRole === role) activeRbacRole = localRbacRoles[0] || null;
+        renderRbacRoleTabs();
+        renderRbacRolePanel();
+        showToast(`Role "${role}" removed. Save to persist.`, 'success');
+    }
+
+    async function saveRbacMatrix() {
+        const token = document.getElementById('admin-secret-token').value;
+        const btn = document.getElementById('rbac-save-btn');
+
+        // Build new-format permissions: { role: { collection: [actions] } }
+        const newPerms = {};
+        const allPermKeys = [...Object.keys(COLLECTION_META), ...Object.keys(SYSTEM_SECTION_META)];
+        localRbacRoles.forEach(role => {
+            newPerms[role] = {};
+            allPermKeys.forEach(col => {
+                const p = (localRbacPerms[role] || {})[col] || {};
+                const actions = RBAC_ACTIONS.filter(a => p[a]);
+                newPerms[role][col] = actions;
+            });
+        });
+
+        const prevHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/admin/security/role-permissions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+                body: JSON.stringify({ permissions: newPerms, format: 'v2' })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to save permissions');
+
+            showToast('Action control permissions saved.', 'success');
+
+            // Update session's allowed collections and re-render sidebar
+            const session = JSON.parse(localStorage.getItem('getmeds_admin_session') || '{}');
+            if (session.role) {
+                const rolePerms = newPerms[session.role] || {};
+                // A collection is "accessible" if the role has at least read
+                const allowed = Object.keys(rolePerms).filter(col => (rolePerms[col] || []).includes('read'));
+                session.allowedCollections = allowed;
+                session.roleActionPerms = rolePerms;
+                localStorage.setItem('getmeds_admin_session', JSON.stringify(session));
+                renderSidebarMenu();
+                applyActionControlEnforcement(rolePerms);
+            }
+        } catch (err) {
+            showToast(err.message, 'error');
+        } finally {
+            btn.innerHTML = prevHtml;
+            btn.disabled = false;
+        }
+    }
+
+    // Enforce action-level controls in the UI (hide/disable buttons user can't use)
+    function applyActionControlEnforcement(rolePerms) {
+        // rolePerms: { collection: ['read','create','edit','delete'] }
+        if (!rolePerms) return;
+
+        // ── Security panel sidebar button ──
+        const secBtn = document.getElementById('sidebar-security-btn');
+        if (secBtn) {
+            const secActions = rolePerms['_security'] || [];
+            if (secActions.includes('read')) {
+                secBtn.classList.remove('hidden');
+            } else {
+                secBtn.classList.add('hidden');
+                // If currently on security panel, bounce back to DB hub
+                const secPanel = document.getElementById('security-control-panel');
+                if (secPanel && !secPanel.classList.contains('hidden')) {
+                    hideSecurityControlPanel();
+                }
+            }
+        }
+
+        // ── Collection-level action enforcement ──
+        const col = activeFilter;
+        if (col === 'security') return;
+        const actions = rolePerms[col] || [];
+
+        // Create button
+        const createBtn = document.getElementById('create-doc-btn');
+        if (createBtn) {
+            if (actions.includes('create')) {
+                createBtn.classList.remove('hidden', 'opacity-50', 'pointer-events-none');
+            } else {
+                createBtn.classList.add('hidden');
+            }
+        }
+
+        // Edit/Delete buttons inside table rows — controlled via CSS class on tbody
+        const tbody = document.getElementById('documents-table-body');
+        if (tbody) {
+            if (!actions.includes('edit')) tbody.classList.add('rbac-no-edit');
+            else tbody.classList.remove('rbac-no-edit');
+            if (!actions.includes('delete')) tbody.classList.add('rbac-no-delete');
+            else tbody.classList.remove('rbac-no-delete');
         }
     }
 
@@ -1086,6 +1557,12 @@
                     if (session) {
                         const sessionData = JSON.parse(session);
                         sessionData.token = refreshData.token;
+                        if (refreshData.allowedCollections) {
+                            sessionData.allowedCollections = refreshData.allowedCollections;
+                        }
+                        if (refreshData.roleActionPerms) {
+                            sessionData.roleActionPerms = refreshData.roleActionPerms;
+                        }
                         localStorage.setItem('getmeds_admin_session', JSON.stringify(sessionData));
                         const tokenInput = document.getElementById('admin-secret-token');
                         if (tokenInput) tokenInput.value = refreshData.token;
@@ -1136,6 +1613,8 @@
                 username: data.username,
                 role: data.role,
                 permissions: data.permissions,
+                allowedCollections: data.allowedCollections || [],
+                roleActionPerms: data.roleActionPerms || null,
                 token: data.token
             };
             localStorage.setItem('getmeds_admin_session', JSON.stringify(sessionData));
@@ -1215,13 +1694,30 @@
     }
 
     // ======= URL STATE MANAGEMENT =======
-    function syncUrlToState(docId = null) {
+    function syncUrlToState(docId = null, replace = false) {
         const params = new URLSearchParams();
         params.set('collection', activeFilter);
-        params.set('page', currentPage);
+        if (activeFilter === 'security') {
+            params.set('tab', activeSecurityTab);
+            params.set('page', currentSecurityPage);
+        } else {
+            params.set('page', currentPage);
+        }
         if (docId) params.set('doc', docId);
         const newUrl = `${window.location.pathname}?${params.toString()}`;
-        history.pushState({ collection: activeFilter, page: currentPage, doc: docId || null }, '', newUrl);
+        
+        const state = {
+            collection: activeFilter,
+            page: activeFilter === 'security' ? currentSecurityPage : currentPage,
+            tab: activeFilter === 'security' ? activeSecurityTab : null,
+            doc: docId || null
+        };
+        
+        if (replace) {
+            history.replaceState(state, '', newUrl);
+        } else {
+            history.pushState(state, '', newUrl);
+        }
     }
 
     function readUrlState() {
@@ -1229,12 +1725,21 @@
         const collection = params.get('collection');
         const page = parseInt(params.get('page')) || 1;
         const docId = params.get('doc');
+        const tab = params.get('tab');
 
         // Always populate the sidebar first, regardless of which panel is shown
         renderSidebarMenu();
 
         if (collection === 'security') {
-            showSecurityControlPanel(true);
+            if (tab) activeSecurityTab = tab;
+            currentSecurityPage = page;
+            showSecurityControlPanel(true, tab || 'users');
+            
+            // If the URL did not have tab or page parameters, replaceState to keep address bar sync'd
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has('tab') || !urlParams.has('page')) {
+                syncUrlToState(null, true);
+            }
         } else if (collection && COLLECTION_META[collection]) {
             document.getElementById('security-control-panel').classList.add('hidden');
             document.getElementById('database-hub-panel').classList.remove('hidden');
@@ -1262,7 +1767,9 @@
         if (!state) return;
 
         if (state.collection === 'security') {
-            showSecurityControlPanel(true);
+            if (state.tab) activeSecurityTab = state.tab;
+            currentSecurityPage = state.page || 1;
+            showSecurityControlPanel(true, state.tab || 'users');
         } else {
             document.getElementById('security-control-panel').classList.add('hidden');
             document.getElementById('database-hub-panel').classList.remove('hidden');
