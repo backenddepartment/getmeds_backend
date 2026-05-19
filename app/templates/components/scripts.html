@@ -391,9 +391,10 @@
             const isActive = activeFilter === key;
 
             html += `
-                <a href="#" onclick="setActiveFilter('${key}')" class="flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold ${isActive
-                    ? 'bg-slate-50 border-r-4 border-slate-900 text-slate-900'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                <a href="javascript:void(0)" onclick="setActiveFilter('${key}')" class="flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold ${
+                    isActive
+                        ? 'bg-slate-50 border-r-4 border-slate-900 text-slate-900'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                 } transition duration-200">
                     <div class="flex items-center gap-3">
                         <i class="fa-solid ${meta.icon} text-sm"></i>
@@ -409,6 +410,23 @@
         activeFilter = filterKey;
         currentPage = 1;
 
+        // ── Panel visibility: always guarantee the correct panel is shown ──
+        // If the security panel is currently open, close it and show the DB hub.
+        const secPanel = document.getElementById('security-control-panel');
+        const hubPanel = document.getElementById('database-hub-panel');
+        const secBtn   = document.getElementById('sidebar-security-btn');
+        if (secPanel && !secPanel.classList.contains('hidden')) {
+            secPanel.classList.add('hidden');
+        }
+        if (hubPanel && hubPanel.classList.contains('hidden')) {
+            hubPanel.classList.remove('hidden');
+        }
+        if (secBtn) {
+            secBtn.classList.remove('text-slate-900', 'bg-slate-50', 'border-r-4', 'border-slate-900');
+            secBtn.classList.add('text-slate-500');
+        }
+
+        // ── Update breadcrumbs and page title ──
         const meta = COLLECTION_META[filterKey];
         const titleLabel = meta ? meta.label : 'Products';
         document.getElementById('breadcrumb-filter-name').innerText = titleLabel;
