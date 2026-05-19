@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 # pyrefly: ignore [missing-import]
 from fastapi.templating import Jinja2Templates
+import os
+from pathlib import Path
 from app.api.routes import chatbot, admin
 from app.core.config import get_settings
 
@@ -17,7 +19,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-templates = Jinja2Templates(directory="app/templates")
+# Resolve absolute path to the templates directory relative to this file
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @app.on_event("startup")
 async def startup_event():
