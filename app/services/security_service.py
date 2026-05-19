@@ -69,6 +69,56 @@ class SecurityService:
             )
             return [dict(r) for r in rows]
 
+    async def get_security_record_by_id(self, record_id: str):
+        """
+        Resolves a Supabase UUID to the matching record across all 3 security tables.
+        Returns the record dict with a _table hint, or None if not found.
+        """
+        pool = await self.get_pool()
+        async with pool.acquire() as conn:
+            # Try admin_users first
+            row = await conn.fetchrow(
+                'SELECT id as "_id", username, email, role, status, permissions, created_at FROM admin_users WHERE id = $1::uuid',
+                record_id
+            )
+            if row:
+                d = dict(row)
+                d["_id"] = str(d["_id"])
+                d["_table"] = "admin_users"
+                if d.get("created_at"):
+                    d["created_at"] = d["created_at"].isoformat() + "Z"
+                # Format permissions list cleanly
+                if isinstance(d.get("permissions"), list):
+                    d["permissions"] = ", ".join(d["permissions"])
+                return d
+
+            # Try access_points
+            row = await conn.fetchrow(
+                'SELECT id as "_id", resource, allowed_roles, auth_type FROM access_points WHERE id = $1::uuid',
+                record_id
+            )
+            if row:
+                d = dict(row)
+                d["_id"] = str(d["_id"])
+                d["_table"] = "access_points"
+                return d
+
+            # Try security_logs
+            row = await conn.fetchrow(
+                'SELECT id as "_id", timestamp, event, username as "user", ip_address, status, severity '
+                'FROM security_logs WHERE id = $1::uuid',
+                record_id
+            )
+            if row:
+                d = dict(row)
+                d["_id"] = str(d["_id"])
+                d["_table"] = "security_logs"
+                if isinstance(d.get("timestamp"), datetime):
+                    d["timestamp"] = d["timestamp"].isoformat() + "Z"
+                return d
+
+            return None
+
     async def add_security_log(self, event: str, user: str, ip_address: str, status: str, severity: str):
         pool = await self.get_pool()
         async with pool.acquire() as conn:

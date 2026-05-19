@@ -386,18 +386,27 @@ async def create_collection_document(doc_type: str, data: dict):
 async def get_document_detail(doc_id: str):
     """
     Fetches the complete raw document by _id.
-    Security-prefixed IDs (GMAU/GMAP/GMSL) are resolved from Supabase PostgreSQL.
-    All other CMS document IDs are resolved from Sanity.
+    - Supabase UUIDs (admin_users, access_points, security_logs) → resolved via security_service
+    - Legacy-prefixed security IDs (GMAU/GMAP/GMSL) → resolved via security_service  
+    - All other Sanity CMS document IDs → resolved via Sanity GROQ
     """
+    import re
+    _UUID_RE = re.compile(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        re.IGNORECASE
+    )
+
     try:
-        if doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            # Admin users, access points, security logs live in Supabase
-            result = await security_service.get_user_by_username(doc_id)
+        if _UUID_RE.match(doc_id) or doc_id.startswith(("GMAU", "GMAP", "GMSL")):
+            # Supabase UUID or legacy-prefixed security record
+            result = await security_service.get_security_record_by_id(doc_id)
             if result is None:
-                result = {"_id": doc_id, "note": "Supabase record — edit via Supabase dashboard."}
+                raise HTTPException(status_code=404, detail=f"Security record '{doc_id}' not found in Supabase.")
         else:
             groq_query = f'*[_id == "{doc_id}"][0]'
             result = await sanity_service.query_sanity(groq_query)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
