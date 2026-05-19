@@ -12,6 +12,9 @@ class SecurityService:
         if self.pool is None:
             database_url = os.getenv("DATABASE_URL")
             if not database_url:
+                from app.core.config import get_settings
+                database_url = get_settings().DATABASE_URL
+            if not database_url:
                 raise Exception("DATABASE_URL is not set in environment variables.")
             # Lazily initialize asyncpg connection pool
             self.pool = await asyncpg.create_pool(
