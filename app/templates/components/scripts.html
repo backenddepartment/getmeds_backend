@@ -725,6 +725,9 @@
         activeFilter = 'security';
         if (!skipUrl) syncUrlToState();
 
+        // Always ensure the sidebar collection list is rendered
+        renderSidebarMenu();
+
         // Hide the standard database panel
         document.getElementById('database-hub-panel').classList.add('hidden');
         // Show security panel
@@ -1208,6 +1211,9 @@
         const collection = params.get('collection');
         const page = parseInt(params.get('page')) || 1;
         const docId = params.get('doc');
+
+        // Always populate the sidebar first, regardless of which panel is shown
+        renderSidebarMenu();
 
         if (collection === 'security') {
             showSecurityControlPanel(true);
