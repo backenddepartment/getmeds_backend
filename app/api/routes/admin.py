@@ -385,41 +385,50 @@ async def create_collection_document(doc_type: str, data: dict):
 @router.get("/document/{doc_id}", dependencies=[Depends(verify_admin_token)])
 async def get_document_detail(doc_id: str):
     """
-    Fetches the complete raw document from Sanity by _id for the detail panel view.
+    Fetches the complete raw document by _id.
+    Security-prefixed IDs (GMAU/GMAP/GMSL) are resolved from Supabase PostgreSQL.
+    All other CMS document IDs are resolved from Sanity.
     """
     try:
-        groq_query = f'*[_id == "{doc_id}"][0]'
         if doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            from app.services.sanity_service import sanity_security_service
-            result = await sanity_security_service.query_sanity(groq_query)
+            # Admin users, access points, security logs live in Supabase
+            result = await security_service.get_user_by_username(doc_id)
+            if result is None:
+                result = {"_id": doc_id, "note": "Supabase record — edit via Supabase dashboard."}
         else:
+            groq_query = f'*[_id == "{doc_id}"][0]'
             result = await sanity_service.query_sanity(groq_query)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sanity error: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
     if not result:
         raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found.")
-    
+
     return {"status": "success", "document": result}
 
 @router.patch("/document/{doc_id}", dependencies=[Depends(verify_admin_token)])
 async def update_document(doc_id: str, data: dict):
     """
-    Patches specific fields of an existing document. Only provided fields are updated.
+    Patches specific fields of an existing document.
+    Security-prefixed IDs (GMAU/GMAP) update the Supabase admin_users or access_points table.
+    All other IDs patch Sanity CMS documents.
     """
     if not data:
         raise HTTPException(status_code=400, detail="No fields provided to update.")
     try:
-        # Remove internal Sanity fields that should not be patched
-        for key in ("_id", "_type", "_rev", "_createdAt", "_updatedAt"):
-            data.pop(key, None)
-        mutations = [{"patch": {"id": doc_id, "set": data}}]
         if doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            from app.services.sanity_service import sanity_security_service
-            result = await sanity_security_service.mutate_sanity(mutations)
+            # Security records live in Supabase — update status if provided
+            new_status = data.get("status")
+            username = data.get("username") or doc_id
+            if new_status:
+                await security_service.update_user_status(username, new_status)
+            return {"status": "success", "id": doc_id}
         else:
+            for key in ("_id", "_type", "_rev", "_createdAt", "_updatedAt"):
+                data.pop(key, None)
+            mutations = [{"patch": {"id": doc_id, "set": data}}]
             result = await sanity_service.mutate_sanity(mutations)
-        return {"status": "success", "id": doc_id, "result": result}
+            return {"status": "success", "id": doc_id, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -480,14 +489,15 @@ async def upload_document_image(doc_id: str, request: Request):
 async def delete_document(doc_id: str):
     """
     Unified document deletion endpoint.
+    Security-prefixed IDs (GMAU/GMAP/GMSL) are not directly deleted from Supabase
+    for safety — suspend the user via the toggle instead.
     """
     try:
-        mutations = [{"delete": {"id": doc_id}}]
         if doc_id.startswith(("GMAU", "GMAP", "GMSL")):
-            from app.services.sanity_service import sanity_security_service
-            result = await sanity_security_service.mutate_sanity(mutations)
-        else:
-            result = await sanity_service.mutate_sanity(mutations)
+            # Safety: do not hard-delete Supabase security records via CMS panel
+            return {"status": "ignored", "id": doc_id, "detail": "Security records are managed in Supabase. Use Toggle to suspend."}
+        mutations = [{"delete": {"id": doc_id}}]
+        result = await sanity_service.mutate_sanity(mutations)
         return {"status": "success", "id": doc_id, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -667,7 +677,7 @@ async def export_documents(collection: str, fmt: str = "csv"):
 @router.get("/security/users", dependencies=[Depends(verify_admin_token)])
 async def get_security_users():
     """
-    Exposes admin users stored in the Sanity CMS security collection.
+    Returns all admin users from Supabase PostgreSQL (admin_users table).
     """
     try:
         return await security_service.get_admin_users()
@@ -695,7 +705,7 @@ async def get_security_logs(page: int = 1, limit: int = 5):
 @router.get("/security/access", dependencies=[Depends(verify_admin_token)])
 async def get_security_access():
     """
-    Exposes security access points stored in the Sanity CMS security collection.
+    Returns all access point policies from Supabase PostgreSQL (access_points table).
     """
     try:
         return await security_service.get_access_points()
@@ -705,7 +715,7 @@ async def get_security_access():
 @router.post("/security/user/status", dependencies=[Depends(verify_admin_token)])
 async def update_user_status(payload: dict):
     """
-    Toggles admin user active/suspended status in the Sanity CMS security collection.
+    Toggles admin user active/suspended status in Supabase PostgreSQL (admin_users table).
     """
     username = payload.get("username")
     status = payload.get("status")
