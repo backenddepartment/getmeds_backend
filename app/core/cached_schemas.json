@@ -1,0 +1,509 @@
+[
+  {
+    "name": "categoryBanner",
+    "title": "Category Banner",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Title",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "subtitle",
+        "label": "Subtitle",
+        "type": "string",
+        "required": false,
+        "initialValue": "SHOP BY"
+      },
+      {
+        "name": "image",
+        "label": "Image",
+        "type": "image",
+        "required": false
+      },
+      {
+        "name": "buttonText",
+        "label": "Button Text",
+        "type": "string",
+        "required": false,
+        "initialValue": "SHOP NOW"
+      },
+      {
+        "name": "buttonLink",
+        "label": "Button Link",
+        "type": "string",
+        "required": false,
+        "initialValue": "/product-range"
+      },
+      {
+        "name": "colorScheme",
+        "label": "Color Scheme",
+        "type": "select",
+        "required": false,
+        "options": [
+          {
+            "value": "blue",
+            "label": "Blue"
+          },
+          {
+            "value": "white",
+            "label": "White/Light"
+          },
+          {
+            "value": "green",
+            "label": "Green"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "category",
+    "title": "Category",
+    "fields": [
+      {
+        "name": "categoryId",
+        "label": "Category ID",
+        "type": "string",
+        "required": false,
+        "description": "Unique custom ID (e.g. CAT-001)"
+      },
+      {
+        "name": "category",
+        "label": "Category Name",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "slug",
+        "label": "Slug",
+        "type": "slug",
+        "required": true,
+        "source": "category"
+      },
+      {
+        "name": "subtitle",
+        "label": "Subtitle",
+        "type": "string",
+        "required": false,
+        "description": "Short description for the category card (e.g., \"Cancer Care\")"
+      },
+      {
+        "name": "description",
+        "label": "Description",
+        "type": "text",
+        "required": false
+      },
+      {
+        "name": "icon",
+        "label": "Icon Class",
+        "type": "string",
+        "required": false,
+        "description": "FontAwesome class (e.g., \"fa-capsules\")"
+      },
+      {
+        "name": "image",
+        "label": "Image",
+        "type": "image",
+        "required": false
+      },
+      {
+        "name": "subcategory",
+        "label": "Sub-Categories",
+        "type": "array",
+        "required": false,
+        "description": "Sub-categories belonging to this category (e.g. \"Breast Cancer\", \"Ovarian Cancer\")"
+      }
+    ]
+  },
+  {
+    "name": "chatSession",
+    "title": "Chat Session",
+    "fields": [
+      {
+        "name": "sessionId",
+        "label": "Session ID",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "userName",
+        "label": "User Name",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "lastSubject",
+        "label": "Last Mentioned Subject",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "sessionSummary",
+        "label": "Session Summary",
+        "type": "text",
+        "required": false,
+        "description": "Condensed history of past interactions."
+      },
+      {
+        "name": "messages",
+        "label": "Messages",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "user",
+            "label": "User Message",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "ai",
+            "label": "AI Response",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "timestamp",
+            "label": "Timestamp",
+            "type": "datetime",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lastActivity",
+        "label": "Last Activity",
+        "type": "datetime",
+        "required": false,
+        "initialValue": "(new Date()).toISOString()"
+      }
+    ]
+  },
+  {
+    "name": "dealOfDay",
+    "title": "Deal of the Day",
+    "fields": [
+      {
+        "name": "product",
+        "label": "Product",
+        "type": "reference",
+        "required": true,
+        "to": "product"
+      },
+      {
+        "name": "subtitle",
+        "label": "Subtitle",
+        "type": "string",
+        "required": false,
+        "description": "Special subtitle for the deal (e.g., \"Hydrochloride\")"
+      },
+      {
+        "name": "backgroundText",
+        "label": "Background Text",
+        "type": "string",
+        "required": false,
+        "description": "Giant uppercase text in the background (e.g., \"PALONOSETRON\")"
+      },
+      {
+        "name": "priceOverride",
+        "label": "Price Override",
+        "type": "number",
+        "required": false,
+        "description": "Optional override for the display price"
+      }
+    ]
+  },
+  {
+    "name": "faq",
+    "title": "FAQ & Help Articles",
+    "fields": [
+      {
+        "name": "question",
+        "label": "Question / Title",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "answer",
+        "label": "Answer / Content",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "keywords",
+        "label": "Keywords",
+        "type": "array",
+        "required": false,
+        "description": "Terms that should trigger this FAQ (e.g., \"delivery\", \"shipping\")"
+      },
+      {
+        "name": "relatedLinks",
+        "label": "Related Links",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "title",
+            "label": "Title",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "url",
+            "label": "Url",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "heroSlide",
+    "title": "Hero Slide",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "headerText",
+        "label": "Header Text",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "subHeaderText",
+        "label": "Sub Header Text",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "isSlider",
+        "label": "Use Image Slider?",
+        "type": "boolean",
+        "required": false,
+        "description": "Turn this on to use multiple slides. Turn it off to use one background image.",
+        "initialValue": true
+      },
+      {
+        "name": "backgroundImage",
+        "label": "Background Image",
+        "type": "image",
+        "required": true,
+        "hidden_condition": {
+          "field": "isSlider",
+          "operator": "eq",
+          "value": true
+        }
+      },
+      {
+        "name": "backgroundImageAltText",
+        "label": "Background Image Alt Text",
+        "type": "string",
+        "required": true,
+        "hidden_condition": {
+          "field": "isSlider",
+          "operator": "eq",
+          "value": true
+        }
+      },
+      {
+        "name": "slides",
+        "label": "Slides",
+        "type": "array",
+        "required": true,
+        "description": "Optional. Example: Image 1, Main Banner, Promo Slide.",
+        "hidden_condition": {
+          "field": "isSlider",
+          "operator": "eq",
+          "value": false
+        },
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "label",
+            "label": "Slide Label",
+            "type": "string",
+            "required": false,
+            "description": "Optional. Example: Image 1, Main Banner, Promo Slide."
+          },
+          {
+            "name": "image",
+            "label": "Background Image",
+            "type": "image",
+            "required": true
+          },
+          {
+            "name": "altText",
+            "label": "Alt Text",
+            "type": "string",
+            "required": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "product",
+    "title": "Product",
+    "fields": [
+      {
+        "name": "genericName",
+        "label": "Generic Name",
+        "type": "string",
+        "required": false,
+        "description": "The chemical or generic name of the drug"
+      },
+      {
+        "name": "brandName",
+        "label": "Brand Name",
+        "type": "string",
+        "required": false,
+        "description": "The brand or proprietary name of the drug"
+      },
+      {
+        "name": "name",
+        "label": "Name",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "slug",
+        "label": "Slug",
+        "type": "slug",
+        "required": true,
+        "source": "name"
+      },
+      {
+        "name": "price",
+        "label": "Price",
+        "type": "number",
+        "required": true
+      },
+      {
+        "name": "availability",
+        "label": "Availability",
+        "type": "boolean",
+        "required": false,
+        "description": "Is the product in stock?",
+        "initialValue": true
+      },
+      {
+        "name": "image",
+        "label": "Image",
+        "type": "image",
+        "required": false
+      },
+      {
+        "name": "category",
+        "label": "Category",
+        "type": "reference",
+        "required": false,
+        "to": "category"
+      },
+      {
+        "name": "subCategory",
+        "label": "Sub-Category",
+        "type": "string",
+        "required": false,
+        "description": "Specific sub-category under the selected category"
+      },
+      {
+        "name": "description",
+        "label": "Description",
+        "type": "text",
+        "required": false
+      },
+      {
+        "name": "strength",
+        "label": "Strength",
+        "type": "string",
+        "required": false,
+        "description": "e.g., \"50 mcg / mL\""
+      },
+      {
+        "name": "form",
+        "label": "Form",
+        "type": "string",
+        "required": false,
+        "description": "e.g., \"Solution for IV Infusion\""
+      },
+      {
+        "name": "packaging",
+        "label": "Packaging Type",
+        "type": "string",
+        "required": false,
+        "description": "e.g., \"Box\""
+      }
+    ]
+  },
+  {
+    "name": "service",
+    "title": "Service",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Title",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "description",
+        "label": "Description",
+        "type": "text",
+        "required": false
+      },
+      {
+        "name": "icon",
+        "label": "Icon Class",
+        "type": "string",
+        "required": false,
+        "description": "FontAwesome class (e.g., \"fa-truck-medical\")"
+      },
+      {
+        "name": "link",
+        "label": "Link",
+        "type": "string",
+        "required": false,
+        "initialValue": "/services"
+      }
+    ]
+  },
+  {
+    "name": "team",
+    "title": "Team Member",
+    "fields": [
+      {
+        "name": "name",
+        "label": "Name",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "role",
+        "label": "Role",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "image",
+        "label": "Image",
+        "type": "image",
+        "required": false
+      },
+      {
+        "name": "bio",
+        "label": "Bio",
+        "type": "text",
+        "required": false
+      }
+    ]
+  }
+]

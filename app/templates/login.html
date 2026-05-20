@@ -1,0 +1,139 @@
+{% include 'components/head.html' %}
+
+<body class="bg-[#F8FAFC] text-slate-800 antialiased min-h-screen flex items-center justify-center p-4">
+
+    <!-- Elegant Plain Light Card Container -->
+    <div class="w-full max-w-[420px] bg-white border border-slate-100 rounded-3xl p-8 shadow-[0_8px_30px_rgba(0,0,0,0.02)] flex flex-col gap-6 text-center">
+        <!-- Brand Logo Header -->
+        <div class="flex flex-col items-center gap-2">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 text-xl shadow-sm">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h1 class="text-base font-extrabold text-slate-800 tracking-wide mt-2">GetMEDS Secure Hub</h1>
+            <p class="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Administrative Access Portal</p>
+        </div>
+        
+        <!-- Warning / Alert Display -->
+        <div id="login-alert-box" class="hidden text-[11px] font-bold p-3.5 rounded-xl border text-left flex items-start gap-2.5 transition"></div>
+
+        <!-- Login Credentials Form -->
+        <form id="admin-login-form" onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-4 text-left">
+            <!-- Email Input Field -->
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Email Address</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                        <i class="fa-solid fa-envelope text-xs"></i>
+                    </span>
+                    <input id="login-email" type="email" required placeholder="name@getmeds.com" class="w-full bg-slate-50 border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 text-slate-700 text-xs font-semibold rounded-xl pl-9 pr-3 py-2.5 transition outline-none">
+                </div>
+            </div>
+
+            <!-- Password Input Field -->
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Password</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                        <i class="fa-solid fa-lock text-xs"></i>
+                    </span>
+                    <input id="login-password" type="password" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 text-slate-700 text-xs font-semibold rounded-xl pl-9 pr-10 py-2.5 transition outline-none">
+                    <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition">
+                        <i id="password-toggle-icon" class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="login-btn-submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs shadow-md shadow-blue-500/10 transition flex items-center justify-center gap-2 mt-2">
+                <span>Authenticate & Access</span> <i class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
+            </button>
+        </form>
+        
+        <div class="text-[10px] text-slate-400 font-bold border-t border-slate-50 pt-4 mt-2">
+            Protected by Decoupled Security Microservice &bull; Port 3334
+        </div>
+    </div>
+
+    <!-- Client-side Javascript System -->
+    <script>
+        const originalFetch = window.fetch;
+
+        async function handleLoginSubmit(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const alertBox = document.getElementById('login-alert-box');
+            const submitBtn = document.getElementById('login-btn-submit');
+
+            if (!email || !password) {
+                showLoginAlert("Please enter both email and password.", "error");
+                return;
+            }
+
+            setBtn(submitBtn, true, '<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Verifying credentials...</span>');
+            alertBox.classList.add('hidden');
+            GlobalLoader.start();
+
+            try {
+                const res = await originalFetch('/api/admin/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || "Authentication failed.");
+                }
+
+                const sessionData = {
+                    username: data.username,
+                    role: data.role,
+                    permissions: data.permissions,
+                    allowedCollections: data.allowedCollections || [],
+                    roleActionPerms: data.roleActionPerms || null,
+                    token: data.token
+                };
+                localStorage.setItem('getmeds_admin_session', JSON.stringify(sessionData));
+
+                showLoginAlert("Authentication successful! Loading console...", "success");
+                GlobalLoader.done();
+
+                setTimeout(() => {
+                    window.location.href = '/admin';
+                }, 900);
+
+            } catch (err) {
+                GlobalLoader.fail();
+                setBtn(submitBtn, false);
+                showLoginAlert(err.message, "error");
+            }
+        }
+
+        function showLoginAlert(message, type) {
+            const alertBox = document.getElementById('login-alert-box');
+            alertBox.classList.remove('hidden');
+            alertBox.innerText = message;
+
+            if (type === 'success') {
+                alertBox.className = "text-[11px] font-bold p-3.5 rounded-xl border flex items-start gap-2.5 bg-emerald-50 border-green-200 text-green-700";
+            } else {
+                alertBox.className = "text-[11px] font-bold p-3.5 rounded-xl border flex items-start gap-2.5 bg-rose-50 border-rose-200 text-rose-600";
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('login-password');
+            const icon = document.getElementById('password-toggle-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash text-xs';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye text-xs';
+            }
+        }
+    </script>
+</body>
+</html>

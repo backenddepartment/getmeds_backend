@@ -19,28 +19,34 @@ class SanityService:
             print("WARNING: No Sanity token found in environment!")
 
 
+    _client = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0))
+        return self._client
+
+
     async def query_sanity(self, groq_query: str, params: dict = None):
         """
         Executes a GROQ query against the Sanity API.
         """
         import json
         params_with_quotes = {k: json.dumps(v) for k, v in (params or {}).items()}
-        timeout = httpx.Timeout(30.0, connect=10.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(
-                self.base_url,
-                params={"query": groq_query, **params_with_quotes},
-                headers=self.headers
-            )
+        client = self._get_client()
+        response = await client.get(
+            self.base_url,
+            params={"query": groq_query, **params_with_quotes},
+            headers=self.headers
+        )
 
-
-            if response.status_code != 200:
-                print(f"ERROR: Sanity API returned {response.status_code}")
-                print(f"Response body: {response.text}")
-                response.raise_for_status()
-            
-            data = response.json()
-            return data.get("result", [])
+        if response.status_code != 200:
+            print(f"ERROR: Sanity API returned {response.status_code}")
+            print(f"Response body: {response.text}")
+            response.raise_for_status()
+        
+        data = response.json()
+        return data.get("result", [])
 
 
     async def mutate_sanity(self, mutations: list):
@@ -48,16 +54,41 @@ class SanityService:
         Executes mutations (create, update, delete) against the Sanity API.
         """
         url = f"https://{self.project_id}.api.sanity.io/v{settings.SANITY_API_VERSION}/data/mutate/{self.dataset}"
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                url,
-                json={"mutations": mutations},
-                headers=self.headers
-            )
-            if response.status_code != 200:
-                print(f"ERROR: Mutation failed: {response.text}")
-                response.raise_for_status()
-            return response.json()
+        client = self._get_client()
+        response = await client.post(
+            url,
+            json={"mutations": mutations},
+            headers=self.headers
+        )
+        if response.status_code != 200:
+            print(f"ERROR: Mutation failed: {response.text}")
+            response.raise_for_status()
+        return response.json()
+
+
+    async def upload_asset(self, asset_type: str, file_bytes: bytes, filename: str, content_type: str = None):
+        """
+        Uploads an image or file asset to the Sanity API.
+        asset_type: "images" or "files"
+        """
+        url = f"https://{self.project_id}.api.sanity.io/v{settings.SANITY_API_VERSION}/assets/{asset_type}/{self.dataset}"
+        headers = {**self.headers}
+        if content_type:
+            headers["Content-Type"] = content_type
+        
+        params = {"filename": filename}
+        
+        client = self._get_client()
+        response = await client.post(
+            url,
+            content=file_bytes,
+            headers=headers,
+            params=params
+        )
+        if response.status_code not in (200, 201):
+            print(f"ERROR: Asset upload failed: {response.text}")
+            response.raise_for_status()
+        return response.json()
 
 
     async def save_chat_message(self, session_id: str, role: str, content: str):

@@ -47,8 +47,41 @@ app.add_middleware(
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
+from app.api.routes.admin import decode_access_token, decode_refresh_token
+
+def check_authenticated(request: Request) -> bool:
+    access_token = request.cookies.get("gmp_access_token")
+    if access_token:
+        try:
+            if decode_access_token(access_token):
+                return True
+        except Exception:
+            pass
+            
+    refresh_token = request.cookies.get("gmp_refresh_token")
+    if refresh_token:
+        try:
+            if decode_refresh_token(refresh_token):
+                return True
+        except Exception:
+            pass
+            
+    return False
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def serve_login(request: Request):
+    if check_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={}
+    )
+
 @app.get("/admin", response_class=HTMLResponse)
 async def serve_admin(request: Request):
+    if not check_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
@@ -57,6 +90,8 @@ async def serve_admin(request: Request):
 
 @app.get("/admin/document/{doc_id}", response_class=HTMLResponse)
 async def serve_document_detail(request: Request, doc_id: str):
+    if not check_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="document_detail.html",
@@ -69,6 +104,8 @@ async def serve_document_detail(request: Request, doc_id: str):
 
 @app.get("/admin/create/{collection}", response_class=HTMLResponse)
 async def serve_create_document(request: Request, collection: str):
+    if not check_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="create_document.html",

@@ -67,6 +67,15 @@
     <div class="w-full">
         <!-- Panel 1: Admin Users -->
         <div id="sec-panel-users" class="flex flex-col gap-4 w-full">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-700">Administrative Users</h3>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Manage operator accounts, system roles, and status.</p>
+                </div>
+                <button onclick="openCreateAdminUserModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-[9px]"></i> Add Admin User
+                </button>
+            </div>
             <div class="overflow-x-auto w-full border border-slate-100 rounded-lg bg-white shadow-sm">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -99,6 +108,37 @@
                     </button>
                     <button onclick="saveRbacMatrix()" id="rbac-save-btn" class="bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-2">
                         <i class="fa-solid fa-save"></i> Save Permissions
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bulk Operations control bar -->
+            <div class="flex flex-wrap items-center gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100 text-xs">
+                <div class="flex items-center gap-1.5 text-slate-400 font-extrabold text-[9px] uppercase tracking-wider">
+                    <i class="fa-solid fa-layer-group text-slate-400 text-xs"></i>
+                    <span>Bulk Operations:</span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select id="bulk-target-action" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        <option value="all">— Select Action Column —</option>
+                        <option value="read">READ Column Only</option>
+                        <option value="create">CREATE Column Only</option>
+                        <option value="edit">EDIT Column Only</option>
+                        <option value="delete">DELETE Column Only</option>
+                        <option value="all_cols">All Columns (Read/Create/Edit/Delete)</option>
+                    </select>
+                    <select id="bulk-target-scope" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        <option value="all">— Select Target Scope —</option>
+                        <option value="schemas">Database Schemas Only</option>
+                        <option value="system">System Sections Only</option>
+                        <option value="all_sections">All Sections (Schemas & System)</option>
+                    </select>
+                    <select id="bulk-op-type" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition shadow-sm">
+                        <option value="check">Check (Enable Permission)</option>
+                        <option value="uncheck">Uncheck (Disable Permission)</option>
+                    </select>
+                    <button onclick="applyBulkRbacOperation()" class="px-3.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-lg shadow-sm transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Apply Bulk
                     </button>
                 </div>
             </div>
@@ -145,6 +185,47 @@
                     <!-- Dynamic page list buttons will render here -->
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+<!-- Create Admin User Modal -->
+<div id="create-admin-user-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="create-admin-user-modal-content">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div>
+                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-slate-500"></i> New Admin User
+                </h3>
+                <p class="text-[10px] text-slate-500 mt-1">Create a new administrative account.</p>
+            </div>
+            <button onclick="closeCreateAdminUserModal()" class="text-slate-400 hover:text-slate-600 transition p-2 hover:bg-slate-200 rounded-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Username / Name</label>
+                <input type="text" id="create-admin-username" class="w-full text-sm border-slate-200 rounded-lg focus:ring-slate-500 focus:border-slate-500 bg-slate-50" placeholder="e.g. John Doe">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Email Address</label>
+                <input type="email" id="create-admin-email" class="w-full text-sm border-slate-200 rounded-lg focus:ring-slate-500 focus:border-slate-500 bg-slate-50" placeholder="john@getmeds.ph">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Passcode</label>
+                <input type="password" id="create-admin-passcode" class="w-full text-sm border-slate-200 rounded-lg focus:ring-slate-500 focus:border-slate-500 bg-slate-50" placeholder="Required for login">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">System Role</label>
+                <select id="create-admin-role" class="w-full text-sm border-slate-200 rounded-lg focus:ring-slate-500 focus:border-slate-500 bg-slate-50">
+                </select>
+            </div>
+        </div>
+        <div class="p-5 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
+            <button onclick="closeCreateAdminUserModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition">Cancel</button>
+            <button onclick="submitCreateAdminUser()" class="px-4 py-2 text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 rounded-lg transition flex items-center gap-2" id="create-admin-submit-btn">
+                <i class="fa-solid fa-check"></i> Create User
+            </button>
         </div>
     </div>
 </div>

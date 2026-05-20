@@ -71,50 +71,11 @@
             </div>
         </div>
 
-        <!-- RIGHT: Image Upload + Tips -->
+        <!-- RIGHT: Media Uploads + Tips -->
         <div class="lg:col-span-2 flex flex-col gap-5">
 
-            <!-- Image Upload Card -->
-            <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6" id="image-card">
-                <div class="flex items-center gap-2 mb-4">
-                    <i class="fa-solid fa-image text-slate-400 text-sm"></i>
-                    <h3 class="text-sm font-extrabold text-slate-800">Image</h3>
-                    <span class="text-[9px] text-slate-400 ml-auto">Optional — uploaded after creation</span>
-                </div>
-
-                <!-- Upload Zone -->
-                <div id="upload-zone"
-                    class="relative border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-200 group"
-                    onclick="triggerImageInput()"
-                    ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
-                    <div class="w-14 h-14 rounded-xl bg-slate-100 group-hover:bg-blue-100 transition flex items-center justify-center">
-                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-blue-500 transition"></i>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-xs font-bold text-slate-700">Upload Image</p>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Drag & drop or click to browse</p>
-                        <p class="text-[9px] text-slate-300 mt-1">JPG, PNG, WebP — max 10MB</p>
-                        <p class="text-[9px] text-blue-400 mt-1 font-semibold">Image will upload after document is created</p>
-                    </div>
-                </div>
-
-                <!-- Preview (shown when file selected) -->
-                <div id="image-preview-container" class="hidden mt-3">
-                    <div class="relative rounded-xl overflow-hidden border border-slate-100">
-                        <img id="image-preview" src="" alt="Preview" class="w-full object-cover max-h-48">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-3">
-                            <span class="text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1">
-                                <i class="fa-solid fa-clock text-[8px]"></i> Queued for upload
-                            </span>
-                        </div>
-                    </div>
-                    <button onclick="clearImageSelection()" class="mt-2 text-[10px] text-rose-400 hover:text-rose-600 font-semibold flex items-center gap-1">
-                        <i class="fa-solid fa-xmark text-[9px]"></i> Remove selection
-                    </button>
-                </div>
-
-                <input type="file" id="image-file-input" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
-            </div>
+            <!-- Dynamic Media Fields Container -->
+            <div id="media-fields-container" class="flex flex-col gap-5"></div>
 
             <!-- Tips Card -->
             <div class="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl border border-slate-100 p-6">
@@ -133,7 +94,7 @@
                     </li>
                     <li class="text-[10px] text-slate-500 flex items-start gap-2">
                         <i class="fa-solid fa-circle-check text-green-400 mt-0.5 shrink-0"></i>
-                        After creation, you can edit and upload an image on the detail page.
+                        Media fields (Images and Sliders) are handled dynamically on the right side.
                     </li>
                 </ul>
             </div>
@@ -160,91 +121,35 @@
     const SANITY_PROJECT_ID = "{{ sanity_project_id }}";
     const SANITY_DATASET = "{{ sanity_dataset }}";
 
-    const FIELD_SCHEMAS = {
-        product: [
-            { name:'name', label:'Product Name', type:'text', required:true, placeholder:'e.g. Ibuprofen 400 MG / Tablet' },
-            { name:'price', label:'Price (PHP)', type:'number', required:true, placeholder:'e.g. 95.00', step:'0.01' },
-            { name:'availability', label:'Availability', type:'select', options:[{value:'true',label:'In Stock'},{value:'false',label:'Out of Stock'}] },
-            { name:'category', label:'Category', type:'category_select', required:true },
-            { name:'subCategory', label:'Sub-Category', type:'subcategory_select', required:true },
-            { name:'strength', label:'Strength', type:'text', placeholder:'e.g. 400 mg' },
-            { name:'packaging', label:'Packaging Type', type:'text', placeholder:'e.g. Box of 10 Tablets' },
-            { name:'description', label:'Product Description', type:'textarea', placeholder:'Describe product uses or details...' },
-        ],
-        category: [
-            { name:'title', label:'Category Title', type:'text', required:true, placeholder:'e.g. Heart Health' },
-            { name:'subtitle', label:'Subtitle', type:'text', placeholder:'e.g. Cardiovascular Care' },
-            { name:'description', label:'Description', type:'textarea', placeholder:'Detailed category description...' },
-            { name:'icon', label:'Icon Class (FontAwesome)', type:'text', placeholder:'e.g. fa-heart-pulse' },
-            { name:'subCategories', label:'Sub-Categories (comma separated)', type:'text', placeholder:'e.g. Breast Cancer, Ovarian Cancer, Lung Cancer' },
-        ],
-        heroSlide: [
-            { name:'title', label:'Slide Title', type:'text', required:true, placeholder:'e.g. Your Health Deserves the Best' },
-            { name:'subtitle', label:'Subtitle Text', type:'textarea', placeholder:'Slide body text...' },
-            { name:'primaryButtonText', label:'Primary Button Text', type:'text', placeholder:'e.g. Order Medicines' },
-            { name:'primaryButtonLink', label:'Primary Button Link', type:'text', placeholder:'e.g. /order-medicines' },
-            { name:'secondaryButtonText', label:'Secondary Button Text', type:'text', placeholder:'e.g. Our Services' },
-            { name:'secondaryButtonLink', label:'Secondary Button Link', type:'text', placeholder:'e.g. /services' },
-        ],
-        service: [
-            { name:'title', label:'Service Title', type:'text', required:true, placeholder:'e.g. Home Care Support' },
-            { name:'description', label:'Service Description', type:'textarea', placeholder:'Details about this service...' },
-            { name:'icon', label:'FontAwesome Icon Class', type:'text', placeholder:'e.g. fa-truck-medical' },
-            { name:'link', label:'Redirect URL Path', type:'text', placeholder:'e.g. /services' },
-        ],
-        dealOfDay: [
-            { name:'subtitle', label:'Deal Subtitle', type:'text', placeholder:'e.g. 50% Off Special' },
-            { name:'backgroundText', label:'Giant Background Text', type:'text', placeholder:'e.g. IBUPROFEN' },
-            { name:'priceOverride', label:'Price Override (PHP)', type:'number', placeholder:'e.g. 45.00', step:'0.01' },
-        ],
-        categoryBanner: [
-            { name:'title', label:'Banner Title', type:'text', required:true, placeholder:'e.g. SHOP BY CATEGORY' },
-            { name:'subtitle', label:'Banner Subtitle', type:'text', placeholder:'e.g. BEST SELLER' },
-            { name:'buttonText', label:'Button Text', type:'text', placeholder:'e.g. SHOP NOW' },
-            { name:'buttonLink', label:'Button Link', type:'text', placeholder:'e.g. /product-range' },
-        ],
-        team: [
-            { name:'name', label:'Full Name', type:'text', required:true, placeholder:'e.g. Dr. Sarah Jenkins, MD' },
-            { name:'role', label:'Role / Title', type:'text', required:true, placeholder:'e.g. Head Cardiologist' },
-            { name:'bio', label:'Bio / Background', type:'textarea', placeholder:'Brief professional history...' },
-        ],
-        faq: [
-            { name:'question', label:'Question / Title', type:'text', required:true, placeholder:'e.g. Do you support COD?' },
-            { name:'answer', label:'Answer / Content', type:'textarea', required:true, placeholder:'Provide a detailed answer...' },
-            { name:'keywords', label:'Trigger Keywords (comma separated)', type:'text', placeholder:'e.g. cod, cash, delivery' },
-        ],
-        chatSession: [
-            { name:'sessionId', label:'Session ID', type:'text', required:true, placeholder:'e.g. sess_123456789' },
-            { name:'userName', label:'User Name', type:'text', placeholder:'e.g. John Doe' },
-            { name:'lastSubject', label:'Last Subject', type:'text', placeholder:'e.g. Amoxicillin' },
-            { name:'sessionSummary', label:'Session Summary', type:'textarea', placeholder:'Context memory summary...' },
-        ],
-    };
+    let FIELD_SCHEMAS = {};
+    let COLLECTION_META = {};
+    let IMAGE_COLLECTIONS = [];
 
-    const COLLECTION_META = {
-        product:       { label:'Products',       icon:'fa-pills' },
-        category:      { label:'Categories',     icon:'fa-tags' },
-        heroSlide:     { label:'Hero Slides',    icon:'fa-images' },
-        service:       { label:'Services',       icon:'fa-stethoscope' },
-        dealOfDay:     { label:'Deals',          icon:'fa-tag' },
-        categoryBanner:{ label:'Banners',        icon:'fa-rectangle-ad' },
-        team:          { label:'Team Members',   icon:'fa-user-doctor' },
-        faq:           { label:'FAQs',           icon:'fa-circle-question' },
-        chatSession:   { label:'Chat Sessions',  icon:'fa-comments' },
-    };
 
-    const IMAGE_COLLECTIONS = ['product','category','heroSlide','team','categoryBanner'];
-
-    let pendingImageFile = null;
     let adminToken = '';
 
     // ---- INIT ----
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
         const session = localStorage.getItem('getmeds_admin_session');
         if (session) {
             try { adminToken = JSON.parse(session).token || 'getmeds-admin-secret-key'; }
             catch(e) { adminToken = 'getmeds-admin-secret-key'; }
         } else { adminToken = 'getmeds-admin-secret-key'; }
+
+        // Fetch dynamic schemas
+        try {
+            const res = await fetch('/api/admin/schemas', {
+                headers: { 'X-Admin-Token': adminToken }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                FIELD_SCHEMAS = data.field_schemas || {};
+                COLLECTION_META = data.collection_meta || {};
+                IMAGE_COLLECTIONS = data.image_collections || [];
+            }
+        } catch(e) {
+            console.error("Failed to load schemas dynamically:", e);
+        }
 
         const meta = COLLECTION_META[COLLECTION];
         const label = meta ? meta.label : COLLECTION;
@@ -263,6 +168,7 @@
             document.getElementById('image-card').classList.add('hidden');
         }
 
+        await fetchRoles();
         // Render fields
         renderFields();
     });
@@ -272,6 +178,21 @@
     }
 
     let fetchedCategories = [];
+
+    let fetchedRoles = [];
+    async function fetchRoles() {
+        try {
+            const res = await fetch('/api/admin/security/role-permissions', {
+                headers: { 'X-Admin-Token': adminToken }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                fetchedRoles = data.roles || [];
+            }
+        } catch(e) {
+            console.error('Failed to load roles', e);
+        }
+    }
 
     async function fetchCategoriesAndSetupDropdowns() {
         try {
@@ -285,7 +206,7 @@
             const catSelect = document.getElementById('product-category-select');
             if (catSelect) {
                 catSelect.innerHTML = '<option value="">— Select a Category —</option>' + 
-                    fetchedCategories.map(c => `<option value="${c._id}">${escHtml(c.title)}</option>`).join('');
+                    fetchedCategories.map(c => `<option value="${c._id}">${escHtml(c.category || c.title || c.name || c._id)}</option>`).join('');
                     
                 catSelect.addEventListener('change', (e) => {
                     const catId = e.target.value;
@@ -299,7 +220,7 @@
                     }
                     
                     const selectedCat = fetchedCategories.find(c => c._id === catId);
-                    const subs = selectedCat?.subCategories || [];
+                    const subs = selectedCat?.subcategory || selectedCat?.subCategories || [];
                     
                     if (subs.length === 0) {
                         subSelect.innerHTML = '<option value="">— No sub-categories available —</option>';
@@ -318,45 +239,633 @@
         }
     }
 
+    async function populateReferenceSelect(selectEl, refCollection, selectedVal) {
+        try {
+            const res = await fetch(`/api/admin/documents?collection=${refCollection}&page=1&limit=200`, {
+                headers: { 'X-Admin-Token': adminToken }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const docs = data.documents || [];
+                let html = '<option value="">— Select a Reference —</option>';
+                docs.forEach(doc => {
+                    const label = doc.name || doc.title || doc.question || doc.sessionId || doc._id;
+                    html += `<option value="${doc._id}" ${doc._id === selectedVal ? 'selected' : ''}>${escHtml(label)}</option>`;
+                });
+                selectEl.innerHTML = html;
+            }
+        } catch(e) {
+            console.error("Failed to fetch reference options for " + refCollection, e);
+            selectEl.innerHTML = '<option value="">— Failed to load options —</option>';
+        }
+    }
+
+    function getInitialValue(f) {
+        if (f.initialValue === undefined) return '';
+        let val = f.initialValue;
+        if (typeof val === 'string' && val.includes('(new Date()).toISOString()')) {
+            val = new Date().toISOString();
+        }
+        return val;
+    }
+
+    function isMediaField(field) {
+        if (field.type === 'image') return true;
+        if (field.type === 'object_array' && field.fields) {
+            return field.fields.some(sf => sf.type === 'image');
+        }
+        return false;
+    }
+
+    function evaluateHiddenFields() {
+        const fields = FIELD_SCHEMAS[COLLECTION] || [];
+        const currentValues = {};
+        fields.forEach(f => {
+            const el = document.querySelector(`[name="${f.name}"]`);
+            if (el) {
+                if (el.tagName === 'SELECT' && (el.value === 'true' || el.value === 'false')) {
+                    currentValues[f.name] = el.value === 'true';
+                } else if (el.type === 'checkbox') {
+                    currentValues[f.name] = el.checked;
+                } else {
+                    currentValues[f.name] = el.value;
+                }
+            } else {
+                const imgVal = document.getElementById(`img-value-${f.name}`);
+                if (imgVal) {
+                    currentValues[f.name] = imgVal.value;
+                }
+            }
+        });
+
+        fields.forEach(f => {
+            const wrapper = document.getElementById(`field-wrapper-${f.name}`);
+            const cardWrapper = document.getElementById(`card-wrapper-${f.name}`);
+            if (!wrapper) return;
+            
+            const targetEl = cardWrapper || wrapper;
+
+            if (f.hidden_condition) {
+                const cond = f.hidden_condition;
+                const parentVal = currentValues[cond.field];
+                let isHidden = false;
+                if (cond.operator === 'eq') {
+                    isHidden = (parentVal === cond.value);
+                } else if (cond.operator === 'neq') {
+                    isHidden = (parentVal !== cond.value);
+                }
+
+                if (isHidden) {
+                    targetEl.classList.add('hidden');
+                    const inputEl = wrapper.querySelector('input, select, textarea');
+                    if (inputEl) inputEl.removeAttribute('required');
+                } else {
+                    targetEl.classList.remove('hidden');
+                    if (f.required) {
+                        const inputEl = wrapper.querySelector('input, select, textarea');
+                        if (inputEl) inputEl.setAttribute('required', 'required');
+                    }
+                }
+            }
+        });
+    }
+
+    function renderSingleField(f) {
+        const req = f.required ? '<span class="text-rose-400 ml-0.5">*</span>' : '';
+        let input = '';
+        const initVal = getInitialValue(f);
+        const base = 'w-full border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-700 bg-white transition placeholder-slate-300';
+
+        if (f.name === 'icon' || f.name.toLowerCase().includes('icon')) {
+            const opts = ICON_PRESETS.map(ico => `<option value="${ico.value}" ${String(ico.value) === String(initVal) ? 'selected' : ''}><i class="fa-solid ${ico.value}"></i> ${ico.label}</option>`).join('');
+            input = `<select name="${f.name}" class="${base}">
+                <option value="">— Select an Icon Preset —</option>
+                ${opts}
+            </select>`;
+        } else if (f.type === 'image') {
+            input = `
+            <div class="border border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-center gap-2 transition relative" id="img-dropzone-container-${f.name}">
+                <input type="hidden" name="${f.name}" id="img-value-${f.name}" value="">
+                
+                <div id="img-empty-${f.name}" class="flex flex-col items-center gap-1.5 cursor-pointer w-full text-center" onclick="document.getElementById('file-input-${f.name}').click()">
+                    <div class="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-500 transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-700">Drag & drop or click to upload</p>
+                    <p class="text-[8px] text-slate-400">JPG, PNG, WebP — max 10MB</p>
+                </div>
+
+                <button type="button" onclick="event.stopPropagation(); chooseImageFromLibrary('${f.name}')" class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-extrabold text-blue-500 shadow-sm transition flex items-center gap-1.5 z-10" id="img-lib-btn-${f.name}">
+                    <i class="fa-solid fa-images text-[9px]"></i> Select from Library
+                </button>
+
+                <div id="img-progress-container-${f.name}" class="hidden w-full flex flex-col gap-1 px-4">
+                    <div class="flex justify-between text-[8px] font-extrabold text-blue-500 uppercase tracking-wide">
+                        <span>Uploading to Sanity...</span>
+                        <span id="img-progress-text-${f.name}">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div id="img-progress-bar-${f.name}" class="bg-gradient-to-r from-blue-400 to-indigo-500 h-1.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="img-filled-${f.name}" class="hidden flex items-center gap-3 w-full bg-white p-2 rounded-lg border border-slate-100 shadow-sm relative">
+                    <div class="relative group cursor-pointer" onclick="document.getElementById('file-input-${f.name}').click()">
+                        <img id="img-preview-${f.name}" src="" class="w-12 h-12 object-cover rounded-md border border-slate-100 group-hover:opacity-75 transition">
+                        <div class="absolute inset-0 bg-black/40 rounded-md opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[8px] font-bold">
+                            <i class="fa-solid fa-camera"></i>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[10px] font-bold text-slate-700 truncate" id="img-filename-${f.name}">Uploaded Image</p>
+                        <div class="flex items-center gap-2">
+                            <p class="text-[8px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check"></i> Ready in Sanity
+                            </p>
+                            <button type="button" onclick="event.stopPropagation(); chooseImageFromLibrary('${f.name}')" class="text-[8px] font-extrabold text-blue-500 hover:underline">
+                                Change from Library
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearImageField('${f.name}')" class="text-slate-300 hover:text-rose-500 p-1.5 rounded-md hover:bg-slate-50 transition">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                </div>
+
+                <input type="file" id="file-input-${f.name}" accept="image/*" class="hidden" onchange="handleImageFieldChange(event, '${f.name}')">
+            </div>`;
+        } else if (f.type === 'slug') {
+            input = `<div class="relative flex items-center">
+                <input type="text" name="${f.name}" ${f.required?'required':''} class="${base} pr-16" placeholder="${f.placeholder||'auto-generated-slug'}" value="${initVal}">
+                <button type="button" onclick="regenerateSlug('${f.name}', '${f.source || 'name'}')" class="absolute right-2 px-2 py-1 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-lg text-[9px] font-extrabold text-slate-500 shadow-sm transition">
+                    Auto
+                </button>
+            </div>`;
+            setTimeout(() => {
+                const sourceEl = document.querySelector(`[name="${f.source || 'name'}"]`);
+                const slugEl = document.querySelector(`[name="${f.name}"]`);
+                if (sourceEl && slugEl) {
+                    sourceEl.addEventListener('input', (e) => {
+                        slugEl.value = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    });
+                }
+            }, 100);
+        } else if (f.type === 'object_array') {
+            input = `
+            <div class="border border-slate-100 rounded-2xl bg-slate-50/30 p-4 flex flex-col gap-3" id="array-container-${f.name}">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Array Items</span>
+                    <button type="button" onclick="addArrayItem('${f.name}')" class="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-extrabold text-blue-500 shadow-sm transition flex items-center gap-1">
+                        <i class="fa-solid fa-plus text-[8px]"></i> Add Item
+                    </button>
+                </div>
+                
+                <div id="array-items-list-${f.name}" class="flex flex-col gap-3">
+                    <!-- Dynamic array items -->
+                </div>
+            </div>`;
+        } else if (f.type === 'textarea') {
+            input = `<textarea name="${f.name}" rows="4" ${f.required?'required':''} class="${base} resize-none" placeholder="${f.placeholder||''}">${initVal}</textarea>`;
+        } else if (f.type === 'select') {
+            const opts = f.options.map(o => `<option value="${o.value}" ${String(o.value) === String(initVal) ? 'selected' : ''}>${o.label}</option>`).join('');
+            input = `<select name="${f.name}" class="${base}">${opts}</select>`;
+        } else if (f.type === 'category_select') {
+            input = `<select name="${f.name}" id="product-category-select" ${f.required?'required':''} class="${base}"><option value="">— Loading Categories... —</option></select>`;
+        } else if (f.type === 'subcategory_select') {
+            input = `<select name="${f.name}" id="product-subcategory-select" ${f.required?'required':''} class="${base}" disabled><option value="">— Select a Category first —</option></select>`;
+        } else if (f.type === 'role_select') {
+            const roleOpts = fetchedRoles.map(r => 
+                `<option value="${r}">${escHtml(r)}</option>`
+            ).join('');
+            input = `<select name="${f.name}" class="${base}">
+                <option value="">— Select a Role —</option>
+                ${roleOpts}
+            </select>`;
+        } else if (f.type === 'reference_select') {
+            input = `<select name="${f.name}" id="ref-select-${f.name}" ${f.required?'required':''} class="${base}"><option value="">— Loading Referenced Options... —</option></select>`;
+            setTimeout(() => {
+                const el = document.getElementById(`ref-select-${f.name}`);
+                if (el) populateReferenceSelect(el, f.to, initVal);
+            }, 50);
+        } else if (f.type === 'datetime') {
+            let formattedDate = '';
+            if (initVal) {
+                try {
+                    formattedDate = new Date(initVal).toISOString().slice(0, 16);
+                } catch (e) {
+                    formattedDate = initVal;
+                }
+            }
+            input = `<input type="datetime-local" name="${f.name}" ${f.required?'required':''} class="${base}" value="${formattedDate}">`;
+        } else {
+            const stepAttr = f.step ? `step="${f.step}"` : '';
+            input = `<input type="${f.type}" name="${f.name}" ${f.required?'required':''} ${stepAttr} class="${base}" placeholder="${f.placeholder||''}" value="${initVal}">`;
+        }
+
+        return `<div class="flex flex-col gap-1.5" id="field-wrapper-${f.name}">
+            <label class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">${f.label}${req}</label>
+            ${input}
+        </div>`;
+    }
+
     function renderFields() {
         const fields = FIELD_SCHEMAS[COLLECTION] || [];
         const container = document.getElementById('fields-container');
+        const mediaContainer = document.getElementById('media-fields-container');
 
         if (fields.length === 0) {
             container.innerHTML = `<div class="text-center py-8 text-slate-400"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><p class="text-xs font-bold">No field schema found for collection: ${COLLECTION}</p></div>`;
             return;
         }
 
-        const base = 'w-full border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-700 bg-white transition placeholder-slate-300';
+        const leftFields = fields.filter(f => !isMediaField(f));
+        const mediaFields = fields.filter(f => isMediaField(f));
 
-        container.innerHTML = fields.map(f => {
-            const req = f.required ? '<span class="text-rose-400 ml-0.5">*</span>' : '';
-            let input = '';
+        container.innerHTML = leftFields.map(f => renderSingleField(f)).join('');
 
-            if (f.type === 'textarea') {
-                input = `<textarea name="${f.name}" rows="4" ${f.required?'required':''} class="${base} resize-none" placeholder="${f.placeholder||''}"></textarea>`;
-            } else if (f.type === 'select') {
-                const opts = f.options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-                input = `<select name="${f.name}" class="${base}">${opts}</select>`;
-            } else if (f.type === 'category_select') {
-                input = `<select name="${f.name}" id="product-category-select" ${f.required?'required':''} class="${base}"><option value="">— Loading Categories... —</option></select>`;
-            } else if (f.type === 'subcategory_select') {
-                input = `<select name="${f.name}" id="product-subcategory-select" ${f.required?'required':''} class="${base}" disabled><option value="">— Select a Category first —</option></select>`;
-            } else {
-                const stepAttr = f.step ? `step="${f.step}"` : '';
-                input = `<input type="${f.type}" name="${f.name}" ${f.required?'required':''} ${stepAttr} class="${base}" placeholder="${f.placeholder||''}">`;
+        if (mediaContainer) {
+            mediaContainer.innerHTML = mediaFields.map(f => {
+                const icon = f.type === 'image' ? 'fa-image' : 'fa-images';
+                return `
+                <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-6" id="card-wrapper-${f.name}">
+                    <div class="flex items-center gap-2 mb-4 border-b border-slate-50 pb-3">
+                        <i class="fa-solid ${icon} text-slate-400 text-sm"></i>
+                        <h3 class="text-sm font-extrabold text-slate-800">${f.label}</h3>
+                    </div>
+                    ${renderSingleField(f)}
+                </div>`;
+            }).join('');
+        }
+
+        // Setup dropzones and dynamic categories connection
+        setTimeout(() => {
+            setupImageDropzones();
+            if (COLLECTION === 'product') {
+                fetchCategoriesAndSetupDropdowns();
             }
+            evaluateHiddenFields();
+            container.addEventListener('input', evaluateHiddenFields);
+            container.addEventListener('change', evaluateHiddenFields);
+            if (mediaContainer) {
+                mediaContainer.addEventListener('input', evaluateHiddenFields);
+                mediaContainer.addEventListener('change', evaluateHiddenFields);
+            }
+        }, 100);
+    }
 
-            return `<div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">${f.label}${req}</label>
-                ${input}
+
+    function regenerateSlug(slugFieldName, sourceFieldName) {
+        const sourceEl = document.querySelector(`[name="${sourceFieldName}"]`);
+        const slugEl = document.querySelector(`[name="${slugFieldName}"]`);
+        if (sourceEl && slugEl) {
+            slugEl.value = sourceEl.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        }
+    }
+
+    // ---- IMAGE UPLOAD DROPZONE LOGIC ----
+    async function handleImageFieldChange(event, fieldName) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const emptyState = document.getElementById(`img-empty-${fieldName}`);
+        const progContainer = document.getElementById(`img-progress-container-${fieldName}`);
+        const progBar = document.getElementById(`img-progress-bar-${fieldName}`);
+        const progText = document.getElementById(`img-progress-text-${fieldName}`);
+        const filledState = document.getElementById(`img-filled-${fieldName}`);
+        const previewImg = document.getElementById(`img-preview-${fieldName}`);
+        const filenameText = document.getElementById(`img-filename-${fieldName}`);
+        const inputVal = document.getElementById(`img-value-${fieldName}`);
+
+        emptyState.classList.add('hidden');
+        progContainer.classList.remove('hidden');
+        progBar.style.width = '0%';
+        progText.textContent = '0%';
+
+        try {
+            const assetRef = await uploadAssetFile(file, (percent) => {
+                progBar.style.width = `${percent}%`;
+                progText.textContent = `${percent}%`;
+            });
+            
+            inputVal.value = assetRef;
+            previewImg.src = buildSanityImageUrl(assetRef);
+            filenameText.textContent = file.name;
+            
+            progContainer.classList.add('hidden');
+            filledState.classList.remove('hidden');
+            showToast('Image uploaded successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to upload image:', err);
+            showToast(err.message || 'Image upload failed.', 'error');
+            emptyState.classList.remove('hidden');
+            progContainer.classList.add('hidden');
+        }
+    }
+
+    function clearImageField(fieldName) {
+        document.getElementById(`img-value-${fieldName}`).value = '';
+        document.getElementById(`file-input-${fieldName}`).value = '';
+        document.getElementById(`img-empty-${fieldName}`).classList.remove('hidden');
+        const libBtn = document.getElementById(`img-lib-btn-${fieldName}`);
+        if (libBtn) libBtn.classList.remove('hidden');
+        document.getElementById(`img-filled-${fieldName}`).classList.add('hidden');
+    }
+
+    function setupImageDropzones() {
+        document.querySelectorAll('[id^="img-dropzone-container-"]').forEach(dropzone => {
+            if (dropzone.id.includes('-slides-')) return; // handled separately
+            const fieldName = dropzone.id.replace('img-dropzone-container-', '');
+            
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-blue-400', 'bg-blue-50/20');
+            });
+            dropzone.addEventListener('dragleave', (e) => {
+                dropzone.classList.remove('border-blue-400', 'bg-blue-50/20');
+            });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-blue-400', 'bg-blue-50/20');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const inputEl = document.getElementById(`file-input-${fieldName}`);
+                    if (inputEl) {
+                        const dt = new DataTransfer();
+                        dt.items.add(file);
+                        inputEl.files = dt.files;
+                        inputEl.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+        });
+    }
+
+    // ---- ARRAY OF OBJECTS (E.G. SLIDES) LOGIC ----
+    function updateArrayIndices(fieldName) {
+        const listContainer = document.getElementById(`array-items-list-${fieldName}`);
+        if (!listContainer) return;
+        const blocks = listContainer.querySelectorAll('.array-item-block');
+        blocks.forEach((blk, idx) => {
+            const label = blk.querySelector('.array-item-index-label');
+            if (label) label.textContent = `Item #${idx + 1}`;
+        });
+    }
+
+    function renderArrayItem(fieldName, itemKey, values = {}) {
+        const schemaDef = (FIELD_SCHEMAS[COLLECTION] || []).find(f => f.name === fieldName);
+        if (!schemaDef || !schemaDef.fields) return '';
+        
+        const baseInput = 'w-full border border-slate-200 focus:border-blue-400 focus:outline-none rounded-xl px-3 py-2 text-xs text-slate-700 bg-white transition';
+        
+        const fieldsHtml = schemaDef.fields.map(nf => {
+            const req = nf.required ? '<span class="text-rose-400 ml-0.5">*</span>' : '';
+            let val = values[nf.name] !== undefined ? values[nf.name] : '';
+            if (val === '' && nf.initialValue !== undefined) {
+                val = nf.initialValue;
+                if (typeof val === 'string' && val.includes('(new Date()).toISOString()')) {
+                    val = new Date().toISOString();
+                }
+            }
+            let subFieldInput = '';
+            
+            if (nf.type === 'image') {
+                const imgRef = val?.asset?._ref || '';
+                const hasImg = !!imgRef;
+                
+                subFieldInput = `
+                <div class="border border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-3 bg-slate-50/50 flex flex-col items-center justify-center gap-2 transition relative" id="img-dropzone-container-${fieldName}-${itemKey}-${nf.name}">
+                    <input type="hidden" class="array-field-val" data-field="${nf.name}" id="img-value-${fieldName}-${itemKey}-${nf.name}" value="${imgRef}">
+                    
+                    <div id="img-empty-${fieldName}-${itemKey}-${nf.name}" class="${hasImg ? 'hidden' : ''} flex flex-col items-center gap-1 cursor-pointer w-full text-center" onclick="document.getElementById('file-input-${fieldName}-${itemKey}-${nf.name}').click()">
+                        <div class="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-500 transition">
+                            <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                        </div>
+                        <p class="text-[9px] font-bold text-slate-700">Click to upload</p>
+                    </div>
+
+                    <button type="button" onclick="event.stopPropagation(); chooseNestedImageFromLibrary('${fieldName}', '${itemKey}', '${nf.name}')" class="px-2 py-1 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-[8px] font-extrabold text-blue-500 shadow-sm transition flex items-center gap-1 z-10 ${hasImg ? 'hidden' : ''}" id="img-lib-btn-${fieldName}-${itemKey}-${nf.name}">
+                        <i class="fa-solid fa-images text-[8px]"></i> Library
+                    </button>
+
+                    <div id="img-progress-container-${fieldName}-${itemKey}-${nf.name}" class="hidden w-full flex flex-col gap-1 px-2">
+                        <div class="flex justify-between text-[8px] font-extrabold text-blue-500 uppercase tracking-wide">
+                            <span>Uploading...</span>
+                            <span id="img-progress-text-${fieldName}-${itemKey}-${nf.name}">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-1">
+                            <div id="img-progress-bar-${fieldName}-${itemKey}-${nf.name}" class="bg-gradient-to-r from-blue-400 to-indigo-500 h-1 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div id="img-filled-${fieldName}-${itemKey}-${nf.name}" class="${hasImg ? '' : 'hidden'} flex items-center gap-2 w-full bg-white p-1 rounded-lg border border-slate-100 relative">
+                        <div class="relative group cursor-pointer" onclick="document.getElementById('file-input-${fieldName}-${itemKey}-${nf.name}').click()">
+                            <img id="img-preview-${fieldName}-${itemKey}-${nf.name}" src="${hasImg ? buildSanityImageUrl(imgRef) : ''}" class="w-8 h-8 object-cover rounded-md border border-slate-100 group-hover:opacity-75 transition">
+                            <div class="absolute inset-0 bg-black/40 rounded-md opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[7px] font-bold">
+                                <i class="fa-solid fa-camera"></i>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-col gap-0.5">
+                                <p class="text-[8px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-0.5">
+                                    <i class="fa-solid fa-circle-check"></i> Ready
+                                </p>
+                                <button type="button" onclick="event.stopPropagation(); chooseNestedImageFromLibrary('${fieldName}', '${itemKey}', '${nf.name}')" class="text-[7px] text-left font-extrabold text-blue-500 hover:underline">
+                                    Change
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" onclick="clearNestedImageField('${fieldName}', '${itemKey}', '${nf.name}')" class="text-slate-300 hover:text-rose-500 p-1 rounded hover:bg-slate-50 transition">
+                            <i class="fa-solid fa-trash-can text-[9px]"></i>
+                        </button>
+                    </div>
+
+                    <input type="file" id="file-input-${fieldName}-${itemKey}-${nf.name}" accept="image/*" class="hidden" onchange="handleNestedImageFieldChange(event, '${fieldName}', '${itemKey}', '${nf.name}')">
+                </div>`;
+            } else if (nf.type === 'reference_select') {
+                subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}" id="ref-select-${fieldName}-${itemKey}-${nf.name}">
+                    <option value="">— Loading referenced options... —</option>
+                </select>`;
+                setTimeout(() => {
+                    const el = document.getElementById(`ref-select-${fieldName}-${itemKey}-${nf.name}`);
+                    if (el) populateReferenceSelect(el, nf.to, val?._ref || val || '');
+                }, 50);
+            } else if (nf.type === 'select') {
+                const optHtml = (nf.options || []).map(opt => `<option value="${opt.value}" ${String(val) === String(opt.value) ? 'selected' : ''}>${opt.label}</option>`).join('');
+                subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}">${optHtml}</select>`;
+            } else if (nf.name === 'icon' || nf.name.toLowerCase().includes('icon')) {
+                const opts = ICON_PRESETS.map(ico => `<option value="${ico.value}" ${val === ico.value ? 'selected' : ''}>${ico.label}</option>`).join('');
+                subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}">
+                    <option value="">— Select an Icon —</option>
+                    ${opts}
+                </select>`;
+            } else if (nf.type === 'textarea') {
+                subFieldInput = `<textarea class="array-field-val ${baseInput} resize-none" rows="2" data-field="${nf.name}" placeholder="${nf.placeholder || ''}">${escHtml(val)}</textarea>`;
+            } else if (nf.type === 'datetime') {
+                let formattedDate = '';
+                if (val) {
+                    try {
+                        formattedDate = new Date(val).toISOString().slice(0, 16);
+                    } catch (e) {
+                        formattedDate = val;
+                    }
+                }
+                subFieldInput = `<input type="datetime-local" class="array-field-val ${baseInput}" data-field="${nf.name}" value="${escHtml(formattedDate)}">`;
+            } else {
+                subFieldInput = `<input type="${nf.type || 'text'}" class="array-field-val ${baseInput}" data-field="${nf.name}" value="${escHtml(val)}" placeholder="${nf.placeholder || ''}">`;
+            }
+            
+            return `
+            <div class="flex flex-col gap-1">
+                <label class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">${nf.label}${req}</label>
+                ${subFieldInput}
             </div>`;
         }).join('');
+        
+        return `
+        <div class="array-item-block border border-slate-100 rounded-xl bg-white p-4 shadow-sm flex flex-col gap-3 relative" data-key="${itemKey}">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                <span class="text-[10px] font-extrabold text-slate-600 uppercase tracking-wide array-item-index-label">Item</span>
+                <button type="button" onclick="this.closest('.array-item-block').remove(); updateArrayIndices('${fieldName}')" class="text-slate-300 hover:text-rose-500 p-1 rounded hover:bg-slate-50 transition">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+            <div class="flex flex-col gap-3">
+                ${fieldsHtml}
+            </div>
+        </div>`;
+    }
 
-        // Setup dynamic categories connection
-        if (COLLECTION === 'product') {
-            fetchCategoriesAndSetupDropdowns();
+    function addArrayItem(fieldName, values = {}) {
+        const listContainer = document.getElementById(`array-items-list-${fieldName}`);
+        if (!listContainer) return;
+        const itemKey = 'item-' + Math.random().toString(36).substring(2, 9);
+        const tempContainer = document.createElement('div');
+        tempContainer.innerHTML = renderArrayItem(fieldName, itemKey, values);
+        listContainer.appendChild(tempContainer.firstElementChild);
+        setupNestedImageDropzones(fieldName, itemKey);
+        updateArrayIndices(fieldName);
+    }
+
+    async function handleNestedImageFieldChange(event, fieldName, itemKey, subFieldName) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const emptyState = document.getElementById(`img-empty-${fieldName}-${itemKey}-${subFieldName}`);
+        const progContainer = document.getElementById(`img-progress-container-${fieldName}-${itemKey}-${subFieldName}`);
+        const progBar = document.getElementById(`img-progress-bar-${fieldName}-${itemKey}-${subFieldName}`);
+        const progText = document.getElementById(`img-progress-text-${fieldName}-${itemKey}-${subFieldName}`);
+        const filledState = document.getElementById(`img-filled-${fieldName}-${itemKey}-${subFieldName}`);
+        const previewImg = document.getElementById(`img-preview-${fieldName}-${itemKey}-${subFieldName}`);
+        const inputVal = document.getElementById(`img-value-${fieldName}-${itemKey}-${subFieldName}`);
+
+        emptyState.classList.add('hidden');
+        progContainer.classList.remove('hidden');
+        progBar.style.width = '0%';
+        progText.textContent = '0%';
+
+        try {
+            const assetRef = await uploadAssetFile(file, (percent) => {
+                progBar.style.width = `${percent}%`;
+                progText.textContent = `${percent}%`;
+            });
+            
+            inputVal.value = assetRef;
+            previewImg.src = buildSanityImageUrl(assetRef);
+            progContainer.classList.add('hidden');
+            filledState.classList.remove('hidden');
+            showToast('Nested image uploaded successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to upload nested image:', err);
+            showToast(err.message || 'Image upload failed.', 'error');
+            emptyState.classList.remove('hidden');
+            progContainer.classList.add('hidden');
         }
+    }
+
+    function chooseImageFromLibrary(fieldName) {
+        openMediaLibrary((assetRef, filename) => {
+            const inputVal = document.getElementById(`img-value-${fieldName}`);
+            const previewImg = document.getElementById(`img-preview-${fieldName}`);
+            const filenameText = document.getElementById(`img-filename-${fieldName}`);
+            const emptyState = document.getElementById(`img-empty-${fieldName}`);
+            const filledState = document.getElementById(`img-filled-${fieldName}`);
+            const libBtn = document.getElementById(`img-lib-btn-${fieldName}`);
+            
+            inputVal.value = assetRef;
+            previewImg.src = buildSanityImageUrl(assetRef);
+            filenameText.textContent = filename || 'Library Image';
+            
+            emptyState.classList.add('hidden');
+            if (libBtn) libBtn.classList.add('hidden');
+            filledState.classList.remove('hidden');
+            
+            // Trigger change event to evaluate hidden fields
+            inputVal.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
+    function chooseNestedImageFromLibrary(fieldName, itemKey, subFieldName) {
+        openMediaLibrary((assetRef, filename) => {
+            const inputVal = document.getElementById(`img-value-${fieldName}-${itemKey}-${subFieldName}`);
+            const previewImg = document.getElementById(`img-preview-${fieldName}-${itemKey}-${subFieldName}`);
+            const emptyState = document.getElementById(`img-empty-${fieldName}-${itemKey}-${subFieldName}`);
+            const libBtn = document.getElementById(`img-lib-btn-${fieldName}-${itemKey}-${subFieldName}`);
+            const filledState = document.getElementById(`img-filled-${fieldName}-${itemKey}-${subFieldName}`);
+            
+            inputVal.value = assetRef;
+            previewImg.src = buildSanityImageUrl(assetRef);
+            
+            emptyState.classList.add('hidden');
+            if (libBtn) libBtn.classList.add('hidden');
+            filledState.classList.remove('hidden');
+            
+            // Trigger change event to evaluate hidden fields
+            inputVal.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
+    function clearNestedImageField(fieldName, itemKey, subFieldName) {
+        document.getElementById(`img-value-${fieldName}-${itemKey}-${subFieldName}`).value = '';
+        document.getElementById(`file-input-${fieldName}-${itemKey}-${subFieldName}`).value = '';
+        document.getElementById(`img-empty-${fieldName}-${itemKey}-${subFieldName}`).classList.remove('hidden');
+        const libBtn = document.getElementById(`img-lib-btn-${fieldName}-${itemKey}-${subFieldName}`);
+        if (libBtn) libBtn.classList.remove('hidden');
+        document.getElementById(`img-filled-${fieldName}-${itemKey}-${subFieldName}`).classList.add('hidden');
+    }
+
+    function setupNestedImageDropzones(fieldName, itemKey) {
+        const schemaDef = (FIELD_SCHEMAS[COLLECTION] || []).find(f => f.name === fieldName);
+        if (!schemaDef || !schemaDef.fields) return;
+        
+        schemaDef.fields.forEach(nf => {
+            if (nf.type === 'image') {
+                const containerId = `img-dropzone-container-${fieldName}-${itemKey}-${nf.name}`;
+                const dropzone = document.getElementById(containerId);
+                if (!dropzone) return;
+                
+                dropzone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('border-blue-400', 'bg-blue-50/20');
+                });
+                dropzone.addEventListener('dragleave', (e) => {
+                    dropzone.classList.remove('border-blue-400', 'bg-blue-50/20');
+                });
+                dropzone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('border-blue-400', 'bg-blue-50/20');
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        const inputEl = document.getElementById(`file-input-${fieldName}-${itemKey}-${nf.name}`);
+                        if (inputEl) {
+                            const dt = new DataTransfer();
+                            dt.items.add(file);
+                            inputEl.files = dt.files;
+                            inputEl.dispatchEvent(new Event('change'));
+                        }
+                    }
+                });
+            }
+        });
     }
 
     // ---- SUBMIT ----
@@ -367,7 +876,18 @@
         // Validate required fields
         let hasErrors = false;
         fields.filter(f => f.required).forEach(f => {
+            if (f.type === 'object_array') return; // let array items slide
             const el = document.querySelector(`[name="${f.name}"]`);
+            if (f.type === 'image') {
+                const imgVal = document.getElementById(`img-value-${f.name}`);
+                if (!imgVal || !imgVal.value.trim()) {
+                    document.getElementById(`img-dropzone-container-${f.name}`)?.classList.add('border-rose-400', 'bg-rose-50/10');
+                    hasErrors = true;
+                } else {
+                    document.getElementById(`img-dropzone-container-${f.name}`)?.classList.remove('border-rose-400', 'bg-rose-50/10');
+                }
+                return;
+            }
             if (!el || !el.value.trim()) {
                 el?.classList.add('border-rose-400', 'ring-2', 'ring-rose-100');
                 hasErrors = true;
@@ -383,12 +903,55 @@
         // Build payload
         const payload = {};
         fields.forEach(f => {
+            if (f.type === 'object_array') {
+                const listContainer = document.getElementById(`array-items-list-${f.name}`);
+                const items = [];
+                if (listContainer) {
+                    const blocks = listContainer.querySelectorAll('.array-item-block');
+                    blocks.forEach(blk => {
+                        const itemObj = { _key: Math.random().toString(36).substring(2, 11) };
+                        const inputs = blk.querySelectorAll('.array-field-val');
+                        inputs.forEach(inp => {
+                            const fieldName = inp.getAttribute('data-field');
+                            const val = inp.value;
+                            
+                            const subFieldDef = f.fields.find(sf => sf.name === fieldName);
+                            if (subFieldDef) {
+                                if (subFieldDef.type === 'image') {
+                                    itemObj[fieldName] = val ? { _type: 'image', asset: { _type: 'reference', _ref: val } } : null;
+                                } else if (subFieldDef.type === 'reference_select') {
+                                    itemObj[fieldName] = val ? { _type: 'reference', _ref: val } : null;
+                                } else if (subFieldDef.type === 'number') {
+                                    itemObj[fieldName] = val !== '' ? parseFloat(val) : null;
+                                } else if (subFieldDef.type === 'select' && (val === 'true' || val === 'false')) {
+                                    itemObj[fieldName] = val === 'true';
+                                } else {
+                                    itemObj[fieldName] = val;
+                                }
+                            } else {
+                                itemObj[fieldName] = val;
+                            }
+                        });
+                        items.push(itemObj);
+                    });
+                }
+                payload[f.name] = items;
+                return;
+            }
+
             const el = document.querySelector(`[name="${f.name}"]`);
+            if (f.type === 'image') {
+                const imgVal = document.getElementById(`img-value-${f.name}`);
+                payload[f.name] = imgVal && imgVal.value ? { _type: 'image', asset: { _type: 'reference', _ref: imgVal.value } } : null;
+                return;
+            }
+
             if (!el) return;
-            if (f.name === 'availability') payload[f.name] = el.value === 'true';
+            if (f.type === 'select' && (el.value === 'true' || el.value === 'false')) payload[f.name] = el.value === 'true';
+            else if (f.name === 'availability') payload[f.name] = el.value === 'true';
             else if (f.type === 'number') payload[f.name] = el.value !== '' ? parseFloat(el.value) : null;
-            else if (f.name === 'keywords' || f.name === 'subCategories') payload[f.name] = el.value.split(',').map(k=>k.trim()).filter(Boolean);
-            else if (f.type === 'category_select') payload[f.name] = el.value ? { _type: 'reference', _ref: el.value } : null;
+            else if (f.is_array || f.name === 'keywords' || f.name === 'subCategories') payload[f.name] = el.value.split(',').map(k=>k.trim()).filter(Boolean);
+            else if (f.type === 'category_select' || f.type === 'reference_select') payload[f.name] = el.value ? { _type: 'reference', _ref: el.value } : null;
             else if (el.value.trim() !== '') payload[f.name] = el.value;
         });
 
@@ -404,22 +967,6 @@
             const newDocId = data.id;
             GlobalLoader.done();
             showToast('Document created!', 'success');
-
-            // Upload queued image after creation
-            if (pendingImageFile && IMAGE_COLLECTIONS.includes(COLLECTION)) {
-                setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Uploading image...');
-                GlobalLoader.start();
-                try {
-                    const imgRes = await fetch(`/api/admin/document/${newDocId}/image`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': pendingImageFile.type, 'X-Admin-Token': adminToken },
-                        body: pendingImageFile
-                    });
-                    if (imgRes.ok) GlobalLoader.done();
-                    else { GlobalLoader.fail(); showToast('Image upload failed — retry on edit page.', 'warning'); }
-                } catch(e) { GlobalLoader.fail(); showToast('Image upload failed.', 'warning'); }
-            }
-
             setTimeout(() => window.location.href = `/admin/document/${newDocId}`, 900);
         } catch(e) {
             GlobalLoader.fail();
@@ -428,38 +975,17 @@
         }
     }
 
-    // ---- IMAGE QUEUE ----
-    function triggerImageInput() { document.getElementById('image-file-input').click(); }
-
-    function handleFileSelected(e) {
-        const file = e.target.files[0];
-        if (file) queueImage(file);
-    }
-    function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('border-blue-400','bg-blue-50/50'); }
-    function handleDragLeave(e) { e.currentTarget.classList.remove('border-blue-400','bg-blue-50/50'); }
-    function handleDrop(e) {
-        e.preventDefault();
-        e.currentTarget.classList.remove('border-blue-400','bg-blue-50/50');
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) queueImage(file);
-    }
-
-    function queueImage(file) {
-        pendingImageFile = file;
-        const url = URL.createObjectURL(file);
-        document.getElementById('upload-zone').classList.add('hidden');
-        document.getElementById('image-preview').src = url;
-        document.getElementById('image-preview-container').classList.remove('hidden');
-    }
-
-    function clearImageSelection() {
-        pendingImageFile = null;
-        document.getElementById('image-file-input').value = '';
-        document.getElementById('upload-zone').classList.remove('hidden');
-        document.getElementById('image-preview-container').classList.add('hidden');
+    function buildSanityImageUrl(ref) {
+        if (!ref || !ref.startsWith('image-')) return null;
+        const withoutPrefix = ref.replace(/^image-/, '');
+        const lastDash = withoutPrefix.lastIndexOf('-');
+        const ext = withoutPrefix.substring(lastDash + 1);
+        const rest = withoutPrefix.substring(0, lastDash);
+        return `https://cdn.sanity.io/images/${SANITY_PROJECT_ID}/${SANITY_DATASET}/${rest}.${ext}`;
     }
 
     // Use global showToast, setBtn and GlobalLoader from head.html
 </script>
+{% include 'components/media_library.html' %}
 </body>
 </html>
