@@ -206,7 +206,10 @@
             const catSelect = document.getElementById('product-category-select');
             if (catSelect) {
                 catSelect.innerHTML = '<option value="">— Select a Category —</option>' + 
-                    fetchedCategories.map(c => `<option value="${c._id}">${escHtml(c.category || c.title || c.name || c._id)}</option>`).join('');
+                    fetchedCategories.map(c => {
+                        const baseId = c._baseId || (c._id.startsWith('drafts.') ? c._id.substring(7) : c._id);
+                        return `<option value="${baseId}">${escHtml(c.category || c.title || c.name || c._id)}</option>`;
+                    }).join('');
                     
                 catSelect.addEventListener('change', (e) => {
                     const catId = e.target.value;
@@ -219,7 +222,11 @@
                         return;
                     }
                     
-                    const selectedCat = fetchedCategories.find(c => c._id === catId);
+                    const targetBaseId = catId.startsWith('drafts.') ? catId.substring(7) : catId;
+                    const selectedCat = fetchedCategories.find(c => {
+                        const baseId = c._baseId || (c._id.startsWith('drafts.') ? c._id.substring(7) : c._id);
+                        return baseId === targetBaseId;
+                    });
                     const subs = selectedCat?.subcategory || selectedCat?.subCategories || [];
                     
                     if (subs.length === 0) {
@@ -337,11 +344,43 @@
         const base = 'w-full border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none rounded-xl px-4 py-2.5 text-xs text-slate-700 bg-white transition placeholder-slate-300';
 
         if (f.name === 'icon' || f.name.toLowerCase().includes('icon')) {
-            const opts = ICON_PRESETS.map(ico => `<option value="${ico.value}" ${String(ico.value) === String(initVal) ? 'selected' : ''}><i class="fa-solid ${ico.value}"></i> ${ico.label}</option>`).join('');
-            input = `<select name="${f.name}" class="${base}">
-                <option value="">— Select an Icon Preset —</option>
-                ${opts}
-            </select>`;
+            const selectedIco = ICON_PRESETS.find(i => i.value === initVal);
+            const selectedLabel = selectedIco ? selectedIco.label : (initVal || 'None Selected');
+            input = `
+            <div class="flex flex-col gap-2">
+                <!-- Selected Icon Indicator -->
+                <div class="flex items-center gap-3 bg-slate-50/50 border border-slate-200/60 p-2.5 rounded-xl">
+                    <div id="icon-preview-box-${f.name}" class="w-10 h-10 rounded-lg bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-600 text-lg">
+                        <i class="fa-solid ${initVal || 'fa-circle-question'}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Icon Preview</p>
+                        <p id="icon-preview-label-${f.name}" class="text-xs font-bold text-slate-700 truncate">${escHtml(selectedLabel)}</p>
+                    </div>
+                    <button type="button" onclick="toggleIconGrid('${f.name}')" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[9px] font-extrabold text-slate-600 shadow-sm transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-list"></i> Choose Preset
+                    </button>
+                </div>
+                
+                <!-- Hidden input to store selected value -->
+                <input type="hidden" name="${f.name}" id="icon-input-${f.name}" value="${initVal || ''}">
+                
+                <!-- Expandable Grid Container -->
+                <div id="icon-grid-container-${f.name}" class="hidden border border-slate-200 rounded-xl bg-white p-3 shadow-sm max-h-[220px] overflow-y-auto mt-1">
+                    <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        ${ICON_PRESETS.map(ico => {
+                            const isSel = ico.value === initVal;
+                            return `
+                            <button type="button" data-value="${ico.value}" onclick="selectIconPreset('${f.name}', '${ico.value}', '${ico.label}')" class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border ${isSel ? 'border-blue-400 bg-blue-50/30 text-blue-600' : 'border-slate-100 hover:border-blue-300 hover:bg-slate-50/50 text-slate-500'} transition cursor-pointer">
+                                <i class="fa-solid ${ico.value} text-base"></i>
+                                <span class="text-[8px] font-bold text-center leading-tight truncate w-full">${ico.label.split(' ')[0]}</span>
+                            </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+            `;
         } else if (f.type === 'image') {
             input = `
             <div class="border border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-center gap-2 transition relative" id="img-dropzone-container-${f.name}">
@@ -693,11 +732,44 @@
                 const optHtml = (nf.options || []).map(opt => `<option value="${opt.value}" ${String(val) === String(opt.value) ? 'selected' : ''}>${opt.label}</option>`).join('');
                 subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}">${optHtml}</select>`;
             } else if (nf.name === 'icon' || nf.name.toLowerCase().includes('icon')) {
-                const opts = ICON_PRESETS.map(ico => `<option value="${ico.value}" ${val === ico.value ? 'selected' : ''}>${ico.label}</option>`).join('');
-                subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}">
-                    <option value="">— Select an Icon —</option>
-                    ${opts}
-                </select>`;
+                const subFieldId = `${fieldName}-${itemKey}-${nf.name}`;
+                const selectedIco = ICON_PRESETS.find(i => i.value === val);
+                const selectedLabel = selectedIco ? selectedIco.label : (val || 'None Selected');
+                subFieldInput = `
+                <div class="flex flex-col gap-2">
+                    <!-- Selected Icon Indicator -->
+                    <div class="flex items-center gap-3 bg-slate-50/50 border border-slate-200/60 p-2.5 rounded-xl">
+                        <div id="icon-preview-box-${subFieldId}" class="w-10 h-10 rounded-lg bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-600 text-lg">
+                            <i class="fa-solid ${val || 'fa-circle-question'}"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Icon Preview</p>
+                            <p id="icon-preview-label-${subFieldId}" class="text-xs font-bold text-slate-700 truncate">${escHtml(selectedLabel)}</p>
+                        </div>
+                        <button type="button" onclick="toggleIconGrid('${subFieldId}')" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[9px] font-extrabold text-slate-600 shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-list"></i> Choose Preset
+                        </button>
+                    </div>
+                    
+                    <!-- Hidden input to store selected value -->
+                    <input type="hidden" class="array-field-val" data-field="${nf.name}" id="icon-input-${subFieldId}" value="${val || ''}">
+                    
+                    <!-- Expandable Grid Container -->
+                    <div id="icon-grid-container-${subFieldId}" class="hidden border border-slate-200 rounded-xl bg-white p-3 shadow-sm max-h-[180px] overflow-y-auto mt-1">
+                        <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                            ${ICON_PRESETS.map(ico => {
+                                const isSel = ico.value === val;
+                                return `
+                                <button type="button" data-value="${ico.value}" onclick="selectIconPreset('${subFieldId}', '${ico.value}', '${ico.label}')" class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border ${isSel ? 'border-blue-400 bg-blue-50/30 text-blue-600' : 'border-slate-100 hover:border-blue-300 hover:bg-slate-50/50 text-slate-500'} transition cursor-pointer">
+                                    <i class="fa-solid ${ico.value} text-base"></i>
+                                    <span class="text-[8px] font-bold text-center leading-tight truncate w-full">${ico.label.split(' ')[0]}</span>
+                                </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+                `;
             } else if (nf.type === 'textarea') {
                 subFieldInput = `<textarea class="array-field-val ${baseInput} resize-none" rows="2" data-field="${nf.name}" placeholder="${nf.placeholder || ''}">${escHtml(val)}</textarea>`;
             } else if (nf.type === 'datetime') {
@@ -982,6 +1054,47 @@
         const ext = withoutPrefix.substring(lastDash + 1);
         const rest = withoutPrefix.substring(0, lastDash);
         return `https://cdn.sanity.io/images/${SANITY_PROJECT_ID}/${SANITY_DATASET}/${rest}.${ext}`;
+    }
+
+    // ======= ICON SELECTOR HELPERS =======
+    function toggleIconGrid(fieldId) {
+        const grid = document.getElementById(`icon-grid-container-${fieldId}`);
+        if (grid) {
+            grid.classList.toggle('hidden');
+        }
+    }
+
+    function selectIconPreset(fieldId, value, label) {
+        const input = document.getElementById(`icon-input-${fieldId}`);
+        if (input) {
+            input.value = value;
+            // Update preview box icon
+            const prevBox = document.getElementById(`icon-preview-box-${fieldId}`);
+            if (prevBox) {
+                prevBox.innerHTML = `<i class="fa-solid ${value || 'fa-circle-question'}"></i>`;
+            }
+            // Update label
+            const labelEl = document.getElementById(`icon-preview-label-${fieldId}`);
+            if (labelEl) {
+                labelEl.textContent = label || 'None Selected';
+            }
+            // Update button styles in grid
+            const grid = document.getElementById(`icon-grid-container-${fieldId}`);
+            if (grid) {
+                const buttons = grid.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.getAttribute('data-value') === value) {
+                        btn.className = 'flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border border-blue-400 bg-blue-50/30 text-blue-600 transition cursor-pointer';
+                    } else {
+                        btn.className = 'flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-slate-50/50 text-slate-500 transition cursor-pointer';
+                    }
+                });
+                grid.classList.add('hidden');
+            }
+            
+            // Trigger change event to evaluate dependencies/hidden conditions
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     // Use global showToast, setBtn and GlobalLoader from head.html

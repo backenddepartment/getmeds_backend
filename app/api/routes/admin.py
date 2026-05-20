@@ -441,16 +441,17 @@ async def create_collection_document(doc_type: str, data: dict):
         raise HTTPException(status_code=400, detail=f"Unsupported document type: {doc_type}")
     
     try:
-        # Query existing count in database to form next sequential custom ID
-        count_query = f'count(*[_type == "{doc_type}"])'
+        # Query existing count in database to form next sequential custom ID (checking both draft and published counts)
+        count_query = f'count(*[_type == "{doc_type}" && !(_id in path("drafts.**"))])'
         count = await sanity_service.query_sanity(count_query)
         new_idx = count + 1
         prefix = PREFIX_MAP.get(doc_type, f"{doc_type}0000-")
         doc_id = f"{prefix}{new_idx:04d}"
+        draft_id = f"drafts.{doc_id}"
         
         # Build base document mutation payload
         doc_payload = {
-            "_id": doc_id,
+            "_id": draft_id,
             "_type": doc_type,
             **data
         }
@@ -462,7 +463,7 @@ async def create_collection_document(doc_type: str, data: dict):
 
         mutations = [{"create": doc_payload}]
         result = await sanity_service.mutate_sanity(mutations)
-        return {"status": "success", "id": doc_id, "result": result}
+        return {"status": "success", "id": draft_id, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -497,15 +498,24 @@ async def get_document_detail(doc_id: str):
                 raise HTTPException(status_code=404, detail=f"Security record '{doc_id}' not found in Supabase.")
         
         if not is_security_record:
-            groq_query = f'*[_id == "{doc_id}"][0]'
-            result = await sanity_service.query_sanity(groq_query)
+            groq_query = f'*[_id in ["{doc_id}", "drafts.{doc_id}"]]'
+            docs = await sanity_service.query_sanity(groq_query) or []
+            
+            draft_doc = next((d for d in docs if d["_id"].startswith("drafts.")), None)
+            pub_doc = next((d for d in docs if not d["_id"].startswith("drafts.")), None)
+            
+            if not draft_doc and not pub_doc:
+                raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found.")
+            
+            result = draft_doc if draft_doc else pub_doc
+            result["_hasDraft"] = draft_doc is not None
+            result["_isPublished"] = pub_doc is not None
+            result["_status"] = "draft" if (draft_doc and not pub_doc) else ("modified" if (draft_doc and pub_doc) else "published")
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found.")
 
     return {"status": "success", "document": result}
 
@@ -545,11 +555,28 @@ async def update_document(doc_id: str, data: dict):
                 raise HTTPException(status_code=400, detail=f"Unsupported security record table update: {table}")
             return {"status": "success", "id": doc_id}
         else:
+            base_id = doc_id[7:] if doc_id.startswith("drafts.") else doc_id
+            draft_id = f"drafts.{base_id}"
+            
+            # Check if draft exists
+            draft_exists = await sanity_service.query_sanity(f'count(*[_id == "{draft_id}"])')
+            if not draft_exists:
+                # Fetch published doc to copy it to draft
+                pub_doc = await sanity_service.query_sanity(f'*[_id == "{base_id}"][0]')
+                if pub_doc:
+                    # Strip system keys
+                    for key in ("_createdAt", "_updatedAt", "_rev"):
+                        pub_doc.pop(key, None)
+                    pub_doc["_id"] = draft_id
+                    # Create the draft doc copy
+                    await sanity_service.mutate_sanity([{"create": pub_doc}])
+            
             for key in ("_id", "_type", "_rev", "_createdAt", "_updatedAt"):
                 data.pop(key, None)
-            mutations = [{"patch": {"id": doc_id, "set": data}}]
+            
+            mutations = [{"patch": {"id": draft_id, "set": data}}]
             result = await sanity_service.mutate_sanity(mutations)
-            return {"status": "success", "id": doc_id, "result": result}
+            return {"status": "success", "id": draft_id, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -715,19 +742,79 @@ async def delete_document(doc_id: str, delete_seeded: bool = False):
             else:
                 raise HTTPException(status_code=400, detail=f"Deletion not supported for security table: {table}")
         else:
-            mutations = [{"delete": {"id": doc_id}}]
+            base_id = doc_id[7:] if doc_id.startswith("drafts.") else doc_id
+            mutations = [
+                {"delete": {"id": base_id}},
+                {"delete": {"id": f"drafts.{base_id}"}}
+            ]
             if delete_seeded:
-                doc = await sanity_service.query_sanity(f'*[_id == "{doc_id}"][0]')
+                doc = await sanity_service.query_sanity(f'*[_id == "{base_id}"][0]')
+                if not doc:
+                    doc = await sanity_service.query_sanity(f'*[_id == "drafts.{base_id}"][0]')
                 if doc:
                     original_filename = doc.get("originalFilename")
-                    # Query up to 1000 imported IDs to delete in this mutation
-                    query = f'*[(importFileId == "{doc_id}" || importFilename == "{original_filename}") && _id != "{doc_id}"][0...1000]._id'
+                    query = f'*[(importFileId == "{base_id}" || importFileId == "drafts.{base_id}" || importFilename == "{original_filename}") && _id != "{base_id}" && _id != "drafts.{base_id}"][0...1000]._id'
                     seeded_ids = await sanity_service.query_sanity(query) or []
                     for sid in seeded_ids:
                         mutations.append({"delete": {"id": sid}})
                         
             result = await sanity_service.mutate_sanity(mutations)
-            return {"status": "success", "id": doc_id, "deleted_seeded_count": len(mutations) - 1, "result": result}
+            return {"status": "success", "id": base_id, "deleted_seeded_count": max(0, len(mutations) - 2), "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/document/{doc_id}/publish", dependencies=[Depends(verify_admin_token)])
+async def publish_document(doc_id: str):
+    """
+    Publishes draft changes of a document to its published counterpart,
+    and then deletes the draft.
+    """
+    base_id = doc_id[7:] if doc_id.startswith("drafts.") else doc_id
+    draft_id = f"drafts.{base_id}"
+    
+    try:
+        # Fetch the draft
+        draft_doc = await sanity_service.query_sanity(f'*[_id == "{draft_id}"][0]')
+        if not draft_doc:
+            raise HTTPException(status_code=404, detail="No draft found to publish.")
+            
+        pub_doc = dict(draft_doc)
+        pub_doc["_id"] = base_id
+        for key in ("_createdAt", "_updatedAt", "_rev"):
+            pub_doc.pop(key, None)
+            
+        mutations = [
+            {"createOrReplace": pub_doc},
+            {"delete": {"id": draft_id}}
+        ]
+        result = await sanity_service.mutate_sanity(mutations)
+        return {"status": "success", "id": base_id, "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/document/{doc_id}/discard", dependencies=[Depends(verify_admin_token)])
+async def discard_document_draft(doc_id: str):
+    """
+    Discards the draft version of a document.
+    If the document has never been published, discarding the draft deletes it completely.
+    """
+    base_id = doc_id[7:] if doc_id.startswith("drafts.") else doc_id
+    draft_id = f"drafts.{base_id}"
+    
+    try:
+        # Check if published version exists
+        pub_exists = await sanity_service.query_sanity(f'count(*[_id == "{base_id}"])')
+        
+        # Delete the draft
+        mutations = [{"delete": {"id": draft_id}}]
+        result = await sanity_service.mutate_sanity(mutations)
+        
+        return {
+            "status": "success",
+            "id": base_id,
+            "deleted_completely": pub_exists == 0,
+            "result": result
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

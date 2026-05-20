@@ -52,12 +52,90 @@ class SanityService:
     async def mutate_sanity(self, mutations: list):
         """
         Executes mutations (create, update, delete) against the Sanity API.
+        Automatically preprocesses mutations to strip nulls and convert patch set nulls into unsets.
         """
+        def clean_null_values(val):
+            if isinstance(val, dict):
+                cleaned = {}
+                for k, v in val.items():
+                    if v is None:
+                        continue
+                    cleaned_v = clean_null_values(v)
+                    if cleaned_v is not None:
+                        cleaned[k] = cleaned_v
+                if not cleaned:
+                    return None
+                if cleaned.get("_type") == "image" and "asset" not in cleaned:
+                    return None
+                if cleaned.get("_type") == "reference" and "_ref" not in cleaned:
+                    return None
+                return cleaned
+            elif isinstance(val, list):
+                cleaned_list = []
+                for x in val:
+                    if x is not None:
+                        cleaned_x = clean_null_values(x)
+                        if cleaned_x is not None:
+                            cleaned_list.append(cleaned_x)
+                return cleaned_list
+            return val
+
+        def preprocess_mutations(muts: list) -> list:
+            cleaned = []
+            for mut in muts:
+                cleaned_mut = {}
+                for op, body in mut.items():
+                    if op in ("create", "createOrReplace", "createIfNotExists"):
+                        cleaned_mut[op] = clean_null_values(body)
+                    elif op == "patch":
+                        patch_id = body.get("id")
+                        set_data = body.get("set", {})
+                        unset_fields = list(body.get("unset", []))
+                        new_set = {}
+                        
+                        def extract_unsets(d, current_path=""):
+                            for k, v in d.items():
+                                field_path = f"{current_path}.{k}" if current_path else k
+                                if v is None:
+                                    if field_path not in unset_fields:
+                                        unset_fields.append(field_path)
+                                elif isinstance(v, dict):
+                                    is_image_or_ref = v.get("_type") in ("image", "reference")
+                                    has_null_child = any(val is None for val in v.values())
+                                    if is_image_or_ref and has_null_child:
+                                        if field_path not in unset_fields:
+                                            unset_fields.append(field_path)
+                                    else:
+                                        cleaned_d = clean_null_values(v)
+                                        if cleaned_d is None or not cleaned_d:
+                                            if field_path not in unset_fields:
+                                                unset_fields.append(field_path)
+                                        else:
+                                            new_set[k] = cleaned_d
+                                else:
+                                    new_set[k] = v
+                        
+                        extract_unsets(set_data)
+                        cleaned_patch = {"id": patch_id}
+                        if new_set:
+                            cleaned_patch["set"] = new_set
+                        if unset_fields:
+                            cleaned_patch["unset"] = unset_fields
+                        for other_op in body:
+                            if other_op not in ("id", "set", "unset"):
+                                cleaned_patch[other_op] = body[other_op]
+                        cleaned_mut["patch"] = cleaned_patch
+                    else:
+                        cleaned_mut[op] = body
+                cleaned.append(cleaned_mut)
+            return cleaned
+
+        processed_mutations = preprocess_mutations(mutations)
         url = f"https://{self.project_id}.api.sanity.io/v{settings.SANITY_API_VERSION}/data/mutate/{self.dataset}"
         client = self._get_client()
         response = await client.post(
             url,
-            json={"mutations": mutations},
+            json={"mutations": processed_mutations},
             headers=self.headers
         )
         if response.status_code != 200:

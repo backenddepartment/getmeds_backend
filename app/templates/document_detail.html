@@ -19,6 +19,19 @@
         </div>
         <div class="flex items-center gap-2">
             <span id="header-type-badge" class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-slate-50 text-slate-600 border-slate-200"></span>
+            
+            <!-- Draft/Publish Status Container -->
+            <div id="draft-status-badges" class="flex items-center gap-1"></div>
+
+            <button onclick="discardDraft()" id="btn-discard"
+                class="hidden px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-left text-[10px]"></i> Discard Draft
+            </button>
+            <button onclick="publishDocument()" id="btn-publish"
+                class="hidden px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-cloud-arrow-up text-[10px]"></i> Publish
+            </button>
+
             <button onclick="deleteDocument()" id="btn-delete"
                 class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-500 hover:bg-rose-500 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5">
                 <i class="fa-solid fa-trash-can text-[10px]"></i> Delete
@@ -291,6 +304,29 @@
         const badge = document.getElementById('header-type-badge');
         badge.textContent = collectionLabel;
 
+        // Render draft/publishing status badges and buttons
+        const statusBadges = document.getElementById('draft-status-badges');
+        const publishBtn = document.getElementById('btn-publish');
+        const discardBtn = document.getElementById('btn-discard');
+        
+        statusBadges.innerHTML = '';
+        publishBtn.classList.add('hidden');
+        discardBtn.classList.add('hidden');
+        
+        if (doc._status === 'draft') {
+            statusBadges.innerHTML = `<span class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-600 border-amber-200 flex items-center gap-1"><i class="fa-solid fa-circle text-[6px] text-amber-400 animate-pulse"></i> Draft</span>`;
+            publishBtn.classList.remove('hidden');
+        } else if (doc._status === 'modified') {
+            statusBadges.innerHTML = `
+                <span class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 flex items-center gap-1"><i class="fa-solid fa-circle text-[6px] text-emerald-400"></i> Published</span>
+                <span class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-blue-50 text-blue-600 border-blue-200 flex items-center gap-1"><i class="fa-solid fa-circle text-[6px] text-blue-400 animate-pulse"></i> Draft Changes</span>
+            `;
+            publishBtn.classList.remove('hidden');
+            discardBtn.classList.remove('hidden');
+        } else if (doc._status === 'published') {
+            statusBadges.innerHTML = `<span class="text-[9px] font-extrabold px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200 flex items-center gap-1"><i class="fa-solid fa-circle text-[6px] text-emerald-400"></i> Published</span>`;
+        }
+
         const fields = FIELD_SCHEMAS[type] || [];
         const leftFields = fields.filter(f => !isMediaField(f));
         const mediaFields = fields.filter(f => isMediaField(f));
@@ -312,7 +348,11 @@
                         subSelect.disabled = true;
                         return;
                     }
-                    const selectedCat = fetchedCategories.find(c => c._id === catId);
+                    const targetBaseId = catId.startsWith('drafts.') ? catId.substring(7) : catId;
+                    const selectedCat = fetchedCategories.find(c => {
+                        const baseId = c._baseId || (c._id.startsWith('drafts.') ? c._id.substring(7) : c._id);
+                        return baseId === targetBaseId;
+                    });
                     const subs = selectedCat?.subcategory || selectedCat?.subCategories || [];
                     if (subs.length === 0) {
                         subSelect.innerHTML = '<option value="">— No sub-categories available —</option>';
@@ -434,11 +474,43 @@
 
         let input = '';
         if (field.name === 'icon' || field.name.toLowerCase().includes('icon')) {
-            const opts = ICON_PRESETS.map(ico => `<option value="${ico.value}" ${value === ico.value ? 'selected' : ''}>${ico.label}</option>`).join('');
-            input = `<select name="${field.name}" class="${base}">
-                <option value="">— Select an Icon Preset —</option>
-                ${opts}
-            </select>`;
+            const selectedIco = ICON_PRESETS.find(i => i.value === value);
+            const selectedLabel = selectedIco ? selectedIco.label : (value || 'None Selected');
+            input = `
+            <div class="flex flex-col gap-2">
+                <!-- Selected Icon Indicator -->
+                <div class="flex items-center gap-3 bg-slate-50/50 border border-slate-200/60 p-2.5 rounded-xl">
+                    <div id="icon-preview-box-${field.name}" class="w-10 h-10 rounded-lg bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-600 text-lg">
+                        <i class="fa-solid ${value || 'fa-circle-question'}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Icon Preview</p>
+                        <p id="icon-preview-label-${field.name}" class="text-xs font-bold text-slate-700 truncate">${escHtml(selectedLabel)}</p>
+                    </div>
+                    <button type="button" onclick="toggleIconGrid('${field.name}')" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[9px] font-extrabold text-slate-600 shadow-sm transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-list"></i> Choose Preset
+                    </button>
+                </div>
+                
+                <!-- Hidden input to store selected value -->
+                <input type="hidden" name="${field.name}" id="icon-input-${field.name}" value="${value || ''}">
+                
+                <!-- Expandable Grid Container -->
+                <div id="icon-grid-container-${field.name}" class="hidden border border-slate-200 rounded-xl bg-white p-3 shadow-sm max-h-[220px] overflow-y-auto mt-1">
+                    <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        ${ICON_PRESETS.map(ico => {
+                            const isSel = ico.value === value;
+                            return `
+                            <button type="button" data-value="${ico.value}" onclick="selectIconPreset('${field.name}', '${ico.value}', '${ico.label}')" class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border ${isSel ? 'border-blue-400 bg-blue-50/30 text-blue-600' : 'border-slate-100 hover:border-blue-300 hover:bg-slate-50/50 text-slate-500'} transition cursor-pointer">
+                                <i class="fa-solid ${ico.value} text-base"></i>
+                                <span class="text-[8px] font-bold text-center leading-tight truncate w-full">${ico.label.split(' ')[0]}</span>
+                            </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+            `;
         } else if (field.type === 'image') {
             const imgRef = value?.asset?._ref || '';
             const hasImg = !!imgRef;
@@ -539,9 +611,11 @@
             input = `<select name="${field.name}" class="${base}">${opts}</select>`;
         } else if (field.type === 'category_select') {
             const selectedCatId = value?._ref || value || '';
-            const catSelectOpts = fetchedCategories.map(c => 
-                `<option value="${c._id}" ${c._id === selectedCatId ? 'selected' : ''}>${escHtml(c.category || c.title || c.name || c._id)}</option>`
-            ).join('');
+            const targetBaseId = selectedCatId.startsWith('drafts.') ? selectedCatId.substring(7) : selectedCatId;
+            const catSelectOpts = fetchedCategories.map(c => {
+                const baseId = c._baseId || (c._id.startsWith('drafts.') ? c._id.substring(7) : c._id);
+                return `<option value="${baseId}" ${baseId === targetBaseId ? 'selected' : ''}>${escHtml(c.category || c.title || c.name || c._id)}</option>`;
+            }).join('');
             input = `<select name="${field.name}" id="product-category-select" class="${base}">
                 <option value="">— Select a Category —</option>
                 ${catSelectOpts}
@@ -557,7 +631,11 @@
             </select>`;
         } else if (field.type === 'subcategory_select') {
             const activeCatId = currentDoc.category?._ref || currentDoc.category || '';
-            const activeCat = fetchedCategories.find(c => c._id === activeCatId);
+            const targetBaseId = activeCatId.startsWith('drafts.') ? activeCatId.substring(7) : activeCatId;
+            const activeCat = fetchedCategories.find(c => {
+                const baseId = c._baseId || (c._id.startsWith('drafts.') ? c._id.substring(7) : c._id);
+                return baseId === targetBaseId;
+            });
             const subs = activeCat?.subcategory || activeCat?.subCategories || [];
             const subSelectOpts = subs.map(s => 
                 `<option value="${s}" ${s === value ? 'selected' : ''}>${escHtml(s)}</option>`
@@ -774,11 +852,44 @@
                 const optHtml = (nf.options || []).map(opt => `<option value="${opt.value}" ${String(val) === String(opt.value) ? 'selected' : ''}>${opt.label}</option>`).join('');
                 subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}">${optHtml}</select>`;
             } else if (nf.name === 'icon' || nf.name.toLowerCase().includes('icon')) {
-                const opts = ICON_PRESETS.map(ico => `<option value="${ico.value}" ${val === ico.value ? 'selected' : ''}>${ico.label}</option>`).join('');
-                subFieldInput = `<select class="array-field-val ${baseInput}" data-field="${nf.name}">
-                    <option value="">— Select an Icon —</option>
-                    ${opts}
-                </select>`;
+                const subFieldId = `${fieldName}-${itemKey}-${nf.name}`;
+                const selectedIco = ICON_PRESETS.find(i => i.value === val);
+                const selectedLabel = selectedIco ? selectedIco.label : (val || 'None Selected');
+                subFieldInput = `
+                <div class="flex flex-col gap-2">
+                    <!-- Selected Icon Indicator -->
+                    <div class="flex items-center gap-3 bg-slate-50/50 border border-slate-200/60 p-2.5 rounded-xl">
+                        <div id="icon-preview-box-${subFieldId}" class="w-10 h-10 rounded-lg bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-600 text-lg">
+                            <i class="fa-solid ${val || 'fa-circle-question'}"></i>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Icon Preview</p>
+                            <p id="icon-preview-label-${subFieldId}" class="text-xs font-bold text-slate-700 truncate">${escHtml(selectedLabel)}</p>
+                        </div>
+                        <button type="button" onclick="toggleIconGrid('${subFieldId}')" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[9px] font-extrabold text-slate-600 shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-list"></i> Choose Preset
+                        </button>
+                    </div>
+                    
+                    <!-- Hidden input to store selected value -->
+                    <input type="hidden" class="array-field-val" data-field="${nf.name}" id="icon-input-${subFieldId}" value="${val || ''}">
+                    
+                    <!-- Expandable Grid Container -->
+                    <div id="icon-grid-container-${subFieldId}" class="hidden border border-slate-200 rounded-xl bg-white p-3 shadow-sm max-h-[180px] overflow-y-auto mt-1">
+                        <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                            ${ICON_PRESETS.map(ico => {
+                                const isSel = ico.value === val;
+                                return `
+                                <button type="button" data-value="${ico.value}" onclick="selectIconPreset('${subFieldId}', '${ico.value}', '${ico.label}')" class="flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border ${isSel ? 'border-blue-400 bg-blue-50/30 text-blue-600' : 'border-slate-100 hover:border-blue-300 hover:bg-slate-50/50 text-slate-500'} transition cursor-pointer">
+                                    <i class="fa-solid ${ico.value} text-base"></i>
+                                    <span class="text-[8px] font-bold text-center leading-tight truncate w-full">${ico.label.split(' ')[0]}</span>
+                                </button>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+                `;
             } else if (nf.type === 'textarea') {
                 subFieldInput = `<textarea class="array-field-val ${baseInput} resize-none" rows="2" data-field="${nf.name}" placeholder="${nf.placeholder || ''}">${escHtml(val)}</textarea>`;
             } else if (nf.type === 'datetime') {
@@ -1137,6 +1248,62 @@
         }
     }
 
+    async function publishDocument() {
+        if (!await customConfirm({
+            title: 'Publish Document',
+            message: 'Are you sure you want to publish these changes? This will push all draft edits to the live site.',
+            confirmText: 'Yes, Publish'
+        })) return;
+        const btn = document.getElementById('btn-publish');
+        setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Publishing...');
+        GlobalLoader.start();
+        try {
+            const res = await fetch(`/api/admin/document/${DOC_ID}/publish`, {
+                method: 'POST', headers: { 'X-Admin-Token': adminToken }
+            });
+            if (!res.ok) throw new Error((await res.json()).detail);
+            GlobalLoader.done();
+            showToast('Document published successfully!', 'success');
+            setTimeout(() => loadDocument(), 800);
+        } catch(e) {
+            GlobalLoader.fail();
+            showToast(e.message, 'error');
+        } finally {
+            setBtn(btn, false);
+        }
+    }
+
+    async function discardDraft() {
+        if (!await customConfirm({
+            title: 'Discard Draft Changes',
+            message: 'Are you sure you want to discard your draft changes? This will revert the document to its last published state and cannot be undone.',
+            confirmText: 'Yes, Discard'
+        })) return;
+        const btn = document.getElementById('btn-discard');
+        setBtn(btn, true, '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> Discarding...');
+        GlobalLoader.start();
+        try {
+            const res = await fetch(`/api/admin/document/${DOC_ID}/discard`, {
+                method: 'POST', headers: { 'X-Admin-Token': adminToken }
+            });
+            if (!res.ok) throw new Error((await res.json()).detail);
+            const data = await res.json();
+            GlobalLoader.done();
+            showToast('Draft changes discarded.', 'success');
+            if (data.deleted_completely) {
+                const targetCollection = (currentDoc._type === 'adminUser' || currentDoc._type === 'accessPoint') ? 'security' : currentDoc._type;
+                setTimeout(() => window.location.href = `/admin?collection=${targetCollection}`, 1000);
+            } else {
+                setTimeout(() => loadDocument(), 800);
+            }
+        } catch(e) {
+            GlobalLoader.fail();
+            showToast(e.message, 'error');
+        } finally {
+            setBtn(btn, false);
+        }
+    }
+
     function buildSanityImageUrl(ref) {
         if (!ref || !ref.startsWith('image-')) return null;
         const withoutPrefix = ref.replace(/^image-/, '');
@@ -1154,6 +1321,47 @@
 
     function escHtml(v) {
         return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ======= ICON SELECTOR HELPERS =======
+    function toggleIconGrid(fieldId) {
+        const grid = document.getElementById(`icon-grid-container-${fieldId}`);
+        if (grid) {
+            grid.classList.toggle('hidden');
+        }
+    }
+
+    function selectIconPreset(fieldId, value, label) {
+        const input = document.getElementById(`icon-input-${fieldId}`);
+        if (input) {
+            input.value = value;
+            // Update preview box icon
+            const prevBox = document.getElementById(`icon-preview-box-${fieldId}`);
+            if (prevBox) {
+                prevBox.innerHTML = `<i class="fa-solid ${value || 'fa-circle-question'}"></i>`;
+            }
+            // Update label
+            const labelEl = document.getElementById(`icon-preview-label-${fieldId}`);
+            if (labelEl) {
+                labelEl.textContent = label || 'None Selected';
+            }
+            // Update button styles in grid
+            const grid = document.getElementById(`icon-grid-container-${fieldId}`);
+            if (grid) {
+                const buttons = grid.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.getAttribute('data-value') === value) {
+                        btn.className = 'flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border border-blue-400 bg-blue-50/30 text-blue-600 transition cursor-pointer';
+                    } else {
+                        btn.className = 'flex flex-col items-center justify-center gap-1.5 p-2 rounded-lg border border-slate-100 hover:border-blue-300 hover:bg-slate-50/50 text-slate-500 transition cursor-pointer';
+                    }
+                });
+                grid.classList.add('hidden');
+            }
+            
+            // Trigger change event to evaluate dependencies/hidden conditions
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
 
     // Use global showToast, setBtn and GlobalLoader from head.html

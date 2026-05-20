@@ -114,6 +114,30 @@
         "type": "array",
         "required": false,
         "description": "Sub-categories belonging to this category (e.g. \"Breast Cancer\", \"Ovarian Cancer\")"
+      },
+      {
+        "name": "importFilename",
+        "label": "Import Filename",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "importFileId",
+        "label": "Import File ID",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "name",
+        "label": "Name",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "title",
+        "label": "Title",
+        "type": "string",
+        "required": false
       }
     ]
   },
@@ -441,6 +465,18 @@
         "type": "string",
         "required": false,
         "description": "e.g., \"Box\""
+      },
+      {
+        "name": "importFilename",
+        "label": "Import Filename",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "importFileId",
+        "label": "Import File ID",
+        "type": "string",
+        "required": false
       }
     ]
   },

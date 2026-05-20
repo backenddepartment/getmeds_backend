@@ -500,9 +500,18 @@
             }
             return `<td class="px-6 py-3.5 text-xs">${display}</td>`;
         }).join('');
+        let statusBadge = '';
+        if (doc._status === 'draft') {
+            statusBadge = `<span class="ml-2 text-[8px] font-extrabold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 border-amber-200">Draft</span>`;
+        } else if (doc._status === 'modified') {
+            statusBadge = `<span class="ml-2 text-[8px] font-extrabold px-1.5 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-200">Modified</span>`;
+        } else if (doc._status === 'published') {
+            statusBadge = `<span class="ml-2 text-[8px] font-extrabold px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-600 border-emerald-200">Published</span>`;
+        }
+
         return `<tr class="hover:bg-blue-50/30 transition duration-150 cursor-pointer group" data-id="${doc._id}" onclick="openDocumentDetail('${doc._id}')">
             <td class="px-6 py-3.5" onclick="event.stopPropagation()"><input type="checkbox" class="row-checkbox rounded border-slate-300" data-id="${doc._id}" onchange="toggleRowSelection(this)"></td>
-            <td class="px-6 py-3.5 font-mono text-[10px] font-extrabold text-slate-800">${escapeHtml(doc._id)}</td>
+            <td class="px-6 py-3.5 font-mono text-[10px] font-extrabold text-slate-800 flex items-center gap-1">${escapeHtml(doc._baseId || doc._id)}${statusBadge}</td>
             ${cells}
             <td class="px-6 py-3.5" onclick="event.stopPropagation()">
                 <button onclick="deleteKnowledgeDocument('${doc._id}', this)" class="text-slate-300 hover:text-rose-500 rounded-lg w-8 h-8 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
@@ -2099,6 +2108,7 @@
             params.set('page', currentSecurityPage);
         } else {
             params.set('page', currentPage);
+            params.set('limit', pageSize);
         }
         if (docId) params.set('doc', docId);
         const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -2106,6 +2116,7 @@
         const state = {
             collection: activeFilter,
             page: activeFilter === 'security' ? currentSecurityPage : currentPage,
+            limit: activeFilter === 'security' ? null : pageSize,
             tab: activeFilter === 'security' ? activeSecurityTab : null,
             doc: docId || null
         };
@@ -2121,8 +2132,13 @@
         const params = new URLSearchParams(window.location.search);
         const collection = params.get('collection');
         const page = parseInt(params.get('page')) || 1;
+        const limit = parseInt(params.get('limit'));
         const docId = params.get('doc');
         const tab = params.get('tab');
+
+        if (limit && !isNaN(limit)) {
+            pageSize = limit;
+        }
 
         // Always populate the sidebar first, regardless of which panel is shown
         renderSidebarMenu();
@@ -2175,6 +2191,7 @@
 
             activeFilter = state.collection || 'product';
             currentPage = state.page || 1;
+            if (state.limit) pageSize = state.limit;
             const meta = COLLECTION_META[activeFilter];
             if (meta) {
                 document.getElementById('breadcrumb-filter-name').innerText = meta.label;
