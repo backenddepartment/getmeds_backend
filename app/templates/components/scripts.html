@@ -16,6 +16,7 @@
     let FIELD_SCHEMAS = {};
     let IMPORT_FIELD_SCHEMAS = {};
     let IMAGE_COLLECTIONS = [];
+    let SIDEBAR_CONFIG = [];
 
     const ICON_PRESETS = [
         { value: 'fa-pills', label: 'Pills (fa-pills)' },
@@ -95,6 +96,42 @@
         const projectId = window.sanityProjectId || 's7ocz8zp';
         const dataset = window.sanityDataset || 'production';
         return `https://cdn.sanity.io/images/${projectId}/${dataset}/${id}-${dimensions}.${ext}`;
+    }
+
+    function showImageLightbox(src, title = 'Image Preview') {
+        let lightbox = document.getElementById('global-image-lightbox');
+        if (!lightbox) {
+            lightbox = document.createElement('div');
+            lightbox.id = 'global-image-lightbox';
+            lightbox.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[200] flex flex-col items-center justify-center transition-all duration-300 opacity-0 pointer-events-none p-6';
+            lightbox.innerHTML = `
+                <div class="absolute top-4 right-4 flex items-center gap-3 z-50">
+                    <span class="text-xs font-bold text-slate-200 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800" id="lightbox-title">Image Preview</span>
+                    <button onclick="closeImageLightbox()" class="w-10 h-10 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 text-white flex items-center justify-center transition shadow-lg">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="relative max-w-full max-h-full flex items-center justify-center" onclick="event.stopPropagation()">
+                    <img id="lightbox-img" src="" class="max-w-[90vw] max-h-[85vh] object-contain rounded-xl border border-slate-800 shadow-2xl bg-slate-900/40">
+                </div>
+            `;
+            lightbox.addEventListener('click', closeImageLightbox);
+            document.body.appendChild(lightbox);
+        }
+        document.getElementById('lightbox-img').src = src;
+        document.getElementById('lightbox-title').textContent = title;
+        lightbox.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function closeImageLightbox() {
+        const lightbox = document.getElementById('global-image-lightbox');
+        if (lightbox) {
+            lightbox.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                const img = document.getElementById('lightbox-img');
+                if (img) img.src = '';
+            }, 300);
+        }
     }
 
     // Special system sections outside COLLECTION_META (not DB collections)
@@ -279,6 +316,12 @@
                     payload[key] = value === 'true';
                 } else if (schemaDef.name === 'keywords' || schemaDef.name === 'subCategories') {
                     payload[key] = value.split(',').map(k => k.trim()).filter(Boolean);
+                } else if (schemaDef.type === 'chip_array') {
+                    try {
+                        payload[key] = JSON.parse(value);
+                    } catch(e) {
+                        payload[key] = [];
+                    }
                 } else if (schemaDef.type === 'category_select') {
                     payload[key] = value ? { _type: 'reference', _ref: value } : null;
                 } else {
@@ -331,12 +374,30 @@
     };
 
     async function refreshAdminDashboard() {
+        const meta = COLLECTION_META[activeFilter];
+        const isSingleton = meta && meta.viewType === 'singleton';
+
         GlobalLoader.start();
+        renderSidebarMenu();
+
+        if (isSingleton) {
+            // ── Singleton Mode: Load document directly into form editor ──
+            await loadSingletonEditor(activeFilter, meta);
+            GlobalLoader.done();
+            return;
+        }
+
+        // ── Table Mode: Standard paginated table ──
         renderTableSkeleton();
         renderHeaderStatsSkeleton();
-        renderSidebarMenu();
         renderTableHeaders(activeFilter);
         clearBulkSelection && clearBulkSelection();
+
+        // Show table UI, hide singleton editor
+        const hubPanel = document.getElementById('database-hub-panel');
+        const singletonEditor = document.getElementById('singleton-editor-panel');
+        if (singletonEditor) singletonEditor.classList.add('hidden');
+        if (hubPanel) hubPanel.classList.remove('hidden');
 
         try {
             try {
@@ -371,6 +432,833 @@
         }
     }
 
+    async function loadSingletonEditor(collection, meta) {
+        const singletonId = meta.singletonId;
+        const hubPanel = document.getElementById('database-hub-panel');
+        if (hubPanel) hubPanel.classList.add('hidden');
+
+        // Create or get singleton editor panel
+        let editorPanel = document.getElementById('singleton-editor-panel');
+        if (!editorPanel) {
+            editorPanel = document.createElement('div');
+            editorPanel.id = 'singleton-editor-panel';
+            editorPanel.className = 'flex-1 flex flex-col bg-white overflow-y-auto';
+            hubPanel.parentNode.insertBefore(editorPanel, hubPanel.nextSibling);
+        }
+        editorPanel.classList.remove('hidden');
+
+        // Loading skeleton
+        editorPanel.innerHTML = `
+            <div class="p-8 animate-pulse">
+                <div class="w-48 h-6 skeleton rounded-md mb-6"></div>
+                <div class="space-y-4">
+                    <div class="w-full h-10 skeleton rounded-md"></div>
+                    <div class="w-full h-10 skeleton rounded-md"></div>
+                    <div class="w-full h-10 skeleton rounded-md"></div>
+                    <div class="w-3/4 h-10 skeleton rounded-md"></div>
+                </div>
+            </div>
+        `;
+
+        try {
+            const res = await fetch(getAdminApiUrl(`document/${singletonId}`));
+            let docData = {};
+            if (res.ok) {
+                const json = await res.json();
+                docData = json.document || {};
+            }
+
+            const fields = FIELD_SCHEMAS[collection] || [];
+            renderSingletonForm(editorPanel, collection, meta, docData, fields, singletonId);
+        } catch (err) {
+            editorPanel.innerHTML = `
+                <div class="p-8 text-center">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl text-amber-500 mb-3"></i>
+                    <p class="text-sm font-bold text-slate-700 mb-1">Could not load ${escapeHtml(meta.label)}</p>
+                    <p class="text-xs text-slate-400">Document ID: ${singletonId}</p>
+                    <p class="text-xs text-slate-400 mt-1">${escapeHtml(err.message)}</p>
+                </div>
+            `;
+        }
+    }
+
+    function renderSingletonForm(container, collection, meta, docData, fields, singletonId) {
+        let fieldsHtml = '';
+
+        fields.forEach(field => {
+            const currentVal = docData[field.name];
+            fieldsHtml += renderFieldHtml(field, currentVal, '', singletonId);
+        });
+
+        // Status badge
+        let statusHtml = '';
+        if (docData._id) {
+            const st = docData._status || 'published';
+            const stColors = { draft: 'bg-amber-50 text-amber-600 border-amber-200', modified: 'bg-blue-50 text-blue-600 border-blue-200', published: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+            statusHtml = `<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${stColors[st] || stColors.published}">${st.charAt(0).toUpperCase() + st.slice(1)}</span>`;
+        } else {
+            statusHtml = `<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-400 border-slate-200">Not Created</span>`;
+        }
+
+        container.innerHTML = `
+            <div class="p-8 max-w-4xl mx-auto w-full">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <div class="flex items-center gap-3 mb-1">
+                            <i class="fa-solid ${meta.icon || 'fa-file-lines'} text-lg text-indigo-500"></i>
+                            <h1 class="text-xl font-extrabold text-slate-800">${escapeHtml(meta.label)}</h1>
+                            ${statusHtml}
+                        </div>
+                        <p class="text-xs text-slate-400 font-medium">Edit the content configuration for this page.</p>
+                    </div>
+                </div>
+
+                <!-- Alert -->
+                <div id="singleton-alert" class="hidden rounded-lg p-3 text-xs font-semibold mb-6"></div>
+
+                <!-- Form -->
+                <form id="singleton-form" onsubmit="submitSingletonForm(event, '${collection}', '${singletonId}')" class="space-y-5">
+                    ${fieldsHtml}
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
+                        <button type="submit" id="singleton-save-btn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-xs font-extrabold rounded-lg shadow-md hover:shadow-lg hover:from-indigo-600 hover:to-blue-700 transition duration-200">
+                            <i class="fa-solid fa-floppy-disk mr-1.5"></i> Save Changes
+                        </button>
+                        <button type="button" onclick="refreshAdminDashboard()" class="px-4 py-2.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 transition">
+                            <i class="fa-solid fa-rotate-right mr-1"></i> Discard
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        // Evaluate hidden conditions on load, and attach events
+        setTimeout(() => {
+            evaluateSingletonHiddenFields();
+            const formEl = document.getElementById('singleton-form');
+            if (formEl) {
+                formEl.addEventListener('input', evaluateSingletonHiddenFields);
+                formEl.addEventListener('change', evaluateSingletonHiddenFields);
+            }
+        }, 50);
+    }
+
+    function renderFieldHtml(field, currentVal, pathPrefix = '', singletonId = '') {
+        const namePath = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;
+        const displayVal = (currentVal !== undefined && currentVal !== null) ? currentVal : (field.initialValue || '');
+        const idSafeName = namePath.replace(/[\[\]\.]/g, '-');
+
+        // Handle hidden conditions
+        let hiddenAttr = '';
+        if (field.hidden_condition) {
+            const condField = field.hidden_condition.field;
+            const condOp = field.hidden_condition.operator;
+            const condVal = field.hidden_condition.value;
+            const fullCondField = pathPrefix ? `${pathPrefix}.${condField}` : condField;
+            hiddenAttr = `data-hidden-field="${fullCondField}" data-hidden-op="${condOp}" data-hidden-val="${condVal}"`;
+        }
+
+        let html = `<div class="singleton-field-group mb-4" ${hiddenAttr}>`;
+
+        if (field.type === 'object') {
+            const objVal = currentVal || {};
+            const schemaType = field.schemaType || 'object';
+            html += `
+            <div class="border border-slate-200 rounded-xl p-5 bg-slate-50/20 space-y-4 shadow-sm">
+                <div class="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <i class="fa-solid fa-cube text-indigo-400 text-xs"></i>
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">${escapeHtml(field.label)}</h4>
+                </div>
+                ${field.description ? `<p class="text-[10px] text-slate-400 -mt-2">${escapeHtml(field.description)}</p>` : ''}
+                <input type="hidden" name="${namePath}._type" value="${schemaType}">
+                <div class="space-y-4">`;
+                
+            (field.fields || []).forEach(subField => {
+                html += renderFieldHtml(subField, objVal[subField.name], namePath, singletonId);
+            });
+            
+            html += `</div></div>`;
+        } else if (field.type === 'imageWithAlt') {
+            const objVal = currentVal || {};
+            const schemaType = 'imageWithAlt';
+            html += `
+            <div class="border border-slate-200 rounded-xl p-5 bg-slate-50/20 space-y-4 shadow-sm">
+                <div class="flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <i class="fa-solid fa-image text-indigo-400 text-xs"></i>
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">${escapeHtml(field.label)}</h4>
+                </div>
+                <input type="hidden" name="${namePath}._type" value="${schemaType}">
+                <div class="space-y-4">`;
+                
+            const srcField = (field.fields || []).find(sf => sf.name === 'src') || {name: 'src', label: 'Image', type: 'image_path'};
+            const altField = (field.fields || []).find(sf => sf.name === 'alt') || {name: 'alt', label: 'Alt Text', type: 'text'};
+            
+            html += renderFieldHtml(srcField, objVal.src, namePath, singletonId);
+            html += renderFieldHtml(altField, objVal.alt, namePath, singletonId);
+            
+            html += `</div></div>`;
+        } else if (field.type === 'object_array') {
+            const arrVal = Array.isArray(currentVal) ? currentVal : [];
+            html += renderSingletonArrayField(field, arrVal, namePath, singletonId);
+        } else if (field.type === 'image' || field.type === 'image_path') {
+            const imgRef = field.type === 'image' ? (currentVal?.asset?._ref || '') : String(currentVal || '');
+            html += renderSingletonImageField(namePath, field.label, imgRef, field.description);
+        } else if (field.type === 'chip_array') {
+            const arr = Array.isArray(currentVal) ? currentVal : [];
+            const jsonVal = JSON.stringify(arr);
+            html += `
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">${escapeHtml(field.label)}</label>
+            ${field.description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(field.description)}</p>` : ''}
+            <div class="chip-container border border-slate-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 rounded-lg p-2.5 bg-white flex flex-wrap gap-2 transition shadow-sm" id="chip-container-${idSafeName}">
+                <div class="chips-list flex flex-wrap gap-1.5 items-center">
+                    ${arr.map((item, idx) => `
+                        <span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 border border-indigo-100/50 text-xs px-2.5 py-1 rounded-full font-medium">
+                            <span>${escapeHtml(item)}</span>
+                            <button type="button" class="text-indigo-400 hover:text-indigo-600 transition" onclick="removeChip('${idSafeName}', ${idx})">
+                                <i class="fa-solid fa-xmark text-[10px]"></i>
+                            </button>
+                        </span>
+                    `).join('')}
+                </div>
+                <input type="text" class="flex-1 min-w-[120px] text-sm text-slate-700 focus:outline-none py-0.5" placeholder="${field.placeholder || 'Type and press Enter'}" onkeydown="handleChipInput(event, '${idSafeName}')">
+                <input type="hidden" name="${namePath}" id="hidden-${idSafeName}" value="${escapeHtml(jsonVal)}">
+            </div>`;
+        } else if (field.type === 'icon_select') {
+            const currentIcon = String(currentVal || '');
+            html += renderIconPicker(namePath, field.label, currentIcon, field.description);
+        } else if (field.type === 'textarea') {
+            html += `
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">${escapeHtml(field.label)}</label>
+            ${field.description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(field.description)}</p>` : ''}
+            <textarea name="${namePath}" rows="4" class="w-full border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-lg px-4 py-2.5 text-sm bg-white text-slate-700 resize-none transition shadow-sm">${escapeHtml(String(displayVal))}</textarea>`;
+        } else if (field.type === 'select') {
+            const opts = (field.options || []).map(opt => {
+                const sel = String(displayVal) === String(opt.value) ? 'selected' : '';
+                return `<option value="${opt.value}" ${sel}>${opt.label}</option>`;
+            }).join('');
+            html += `
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">${escapeHtml(field.label)}</label>
+            ${field.description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(field.description)}</p>` : ''}
+            <select name="${namePath}" class="w-full border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-lg px-4 py-2.5 text-sm bg-white text-slate-700 transition shadow-sm">${opts}</select>`;
+        } else if (field.type === 'slug') {
+            const slugVal = (typeof displayVal === 'object' && displayVal?.current) ? displayVal.current : String(displayVal);
+            html += `
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">${escapeHtml(field.label)}</label>
+            ${field.description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(field.description)}</p>` : ''}
+            <input type="text" name="${namePath}" value="${escapeHtml(slugVal)}" class="w-full border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-lg px-4 py-2.5 text-sm bg-slate-50 text-slate-500 font-mono transition shadow-sm" readonly>`;
+        } else if (field.type === 'number') {
+            html += `
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">${escapeHtml(field.label)}</label>
+            ${field.description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(field.description)}</p>` : ''}
+            <input type="number" name="${namePath}" value="${displayVal}" step="${field.step || '1'}" class="w-full border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-lg px-4 py-2.5 text-sm bg-white text-slate-700 transition shadow-sm">`;
+        } else {
+            const strVal = (typeof displayVal === 'object') ? JSON.stringify(displayVal) : String(displayVal);
+            html += `
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">${escapeHtml(field.label)}</label>
+            ${field.description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(field.description)}</p>` : ''}
+            <input type="text" name="${namePath}" value="${escapeHtml(strVal)}" class="w-full border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none rounded-lg px-4 py-2.5 text-sm bg-white text-slate-700 transition shadow-sm" placeholder="${field.placeholder || ''}">`;
+        }
+
+        html += `</div>`;
+        return html;
+    }
+
+    function renderSingletonArrayField(field, arrVal, namePath, singletonId) {
+        const nestedFields = field.fields || [];
+        const schemaType = field.schemaType || 'object';
+        const idSafeName = namePath.replace(/[\[\]\.]/g, '-');
+        let html = `
+        <div class="border border-slate-200 rounded-xl p-5 bg-slate-50/20 space-y-4 shadow-sm">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-list-ul text-indigo-400 text-xs"></i>
+                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">${escapeHtml(field.label)}</h4>
+                </div>
+            </div>
+            ${field.description ? `<p class="text-[10px] text-slate-400 -mt-2">${escapeHtml(field.description)}</p>` : ''}
+            <div class="space-y-4" id="arr-field-${idSafeName}">`;
+
+        arrVal.forEach((item, idx) => {
+            const itemPath = `${namePath}[${idx}]`;
+            const idSafeItem = itemPath.replace(/[\[\]\.]/g, '-');
+            html += `
+            <div class="border border-slate-200 rounded-xl p-5 bg-white relative group shadow-sm">
+                <button type="button" onclick="removeSingletonArrayItem('${namePath}', ${idx})" class="absolute top-3 right-3 text-slate-300 hover:text-rose-500 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                <input type="hidden" name="${itemPath}._type" value="${schemaType}">
+                <div class="space-y-4 pt-2">`;
+            
+            nestedFields.forEach(nf => {
+                const subVal = item ? item[nf.name] : undefined;
+                html += renderFieldHtml(nf, subVal, itemPath, singletonId);
+            });
+            
+            html += `</div></div>`;
+        });
+
+        html += `</div>
+            <button type="button" onclick="addSingletonArrayItem('${namePath}')" class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 transition shadow-sm">
+                <i class="fa-solid fa-plus text-[9px]"></i> Add Item
+            </button>
+        </div>`;
+        return html;
+    }
+
+    function addSingletonArrayItem(namePath) {
+        const idSafeName = namePath.replace(/[\[\]\.]/g, '-');
+        const container = document.getElementById(`arr-field-${idSafeName}`);
+        if (!container) return;
+        
+        const schema = FIELD_SCHEMAS[activeFilter] || [];
+        const arrField = getFieldDefByPath(namePath, schema);
+        if (!arrField || !arrField.fields) return;
+
+        const idx = container.children.length;
+        const itemPath = `${namePath}[${idx}]`;
+        const schemaType = arrField.schemaType || 'object';
+
+        let html = `
+        <div class="border border-slate-200 rounded-xl p-5 bg-white relative group shadow-sm">
+            <button type="button" onclick="this.closest('.relative').remove(); reindexSingletonArray('${namePath}')" class="absolute top-3 right-3 text-slate-300 hover:text-rose-500 transition"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            <input type="hidden" name="${itemPath}._type" value="${schemaType}">
+            <div class="space-y-4 pt-2">`;
+        
+        arrField.fields.forEach(nf => {
+            html += renderFieldHtml(nf, undefined, itemPath, '');
+        });
+        
+        html += `</div></div>`;
+        container.insertAdjacentHTML('beforeend', html);
+        reindexSingletonArray(namePath);
+    }
+
+    function removeSingletonArrayItem(fieldName, idx) {
+        const idSafeName = fieldName.replace(/[\[\]\.]/g, '-');
+        const container = document.getElementById(`arr-field-${idSafeName}`);
+        if (!container || !container.children[idx]) return;
+        container.children[idx].remove();
+        reindexSingletonArray(fieldName);
+        
+        // Trigger evaluateHiddenFields in case the array removal affects conditions
+        evaluateSingletonHiddenFields();
+    }
+
+    function reindexSingletonArray(namePath) {
+        const idSafeName = namePath.replace(/[\[\]\.]/g, '-');
+        const container = document.getElementById(`arr-field-${idSafeName}`);
+        if (!container) return;
+        
+        Array.from(container.children).forEach((child, idx) => {
+            const inputs = child.querySelectorAll('[name]');
+            inputs.forEach(input => {
+                const name = input.getAttribute('name');
+                const regex = new RegExp(`^(${escapeRegExp(namePath)})\\[\\d+\\](.*)$`);
+                const match = name.match(regex);
+                if (match) {
+                    const newName = `${match[1]}[${idx}]${match[2]}`;
+                    input.setAttribute('name', newName);
+                    
+                    // Update id elements if any
+                    const oldId = input.getAttribute('id');
+                    if (oldId) {
+                        const newId = newName.replace(/[\[\]\.]/g, '-');
+                        input.setAttribute('id', newId);
+                    }
+                }
+            });
+            
+            // Update trash button index
+            const removeBtn = child.querySelector('button[onclick^="removeSingletonArrayItem"]');
+            if (removeBtn) {
+                removeBtn.setAttribute('onclick', `removeSingletonArrayItem('${namePath}', ${idx})`);
+            }
+        });
+    }
+
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function setNestedValue(obj, keyPath, value) {
+        const parts = keyPath.split('.');
+        let current = obj;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            const arrayMatch = part.match(/^([^\[]+)\[(\d+)\]$/);
+            if (arrayMatch) {
+                const arrName = arrayMatch[1];
+                const idx = parseInt(arrayMatch[2]);
+                if (!current[arrName]) current[arrName] = [];
+                if (!current[arrName][idx]) current[arrName][idx] = {};
+                current = current[arrName][idx];
+            } else {
+                if (!current[part]) current[part] = {};
+                current = current[part];
+            }
+        }
+        
+        const lastPart = parts[parts.length - 1];
+        const arrayMatch = lastPart.match(/^([^\[]+)\[(\d+)\]$/);
+        if (arrayMatch) {
+            const arrName = arrayMatch[1];
+            const idx = parseInt(arrayMatch[2]);
+            if (!current[arrName]) current[arrName] = [];
+            current[arrName][idx] = value;
+        } else {
+            current[lastPart] = value;
+        }
+    }
+
+    function getFieldDefByPath(path, schema) {
+        const normalized = path.replace(/\[\d+\]/g, '');
+        const parts = normalized.split('.');
+        
+        let currentFields = schema;
+        let result = null;
+        
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            const field = currentFields.find(f => f.name === part);
+            if (!field) return null;
+            if (i === parts.length - 1) {
+                result = field;
+            } else {
+                currentFields = field.fields || [];
+            }
+        }
+        return result;
+    }
+
+    function chooseSingletonImageFromLibrary(name, idSafeName) {
+        openMediaLibrary((assetRef, filename) => {
+            const inputVal = document.getElementById(`img-value-${idSafeName}`);
+            const previewImg = document.getElementById(`img-preview-${idSafeName}`);
+            const filenameText = document.getElementById(`img-filename-${idSafeName}`);
+            const emptyState = document.getElementById(`img-empty-${idSafeName}`);
+            const libBtn = document.getElementById(`img-lib-btn-${idSafeName}`);
+            const filledState = document.getElementById(`img-filled-${idSafeName}`);
+
+            inputVal.value = assetRef;
+            previewImg.src = buildSanityImageUrl(assetRef);
+            filenameText.textContent = filename || 'Library Image';
+
+            emptyState.classList.add('hidden');
+            if (libBtn) libBtn.classList.add('hidden');
+            filledState.classList.remove('hidden');
+            
+            showToast('Image selected from library.', 'success');
+        });
+    }
+
+    function clearSingletonImageField(idSafeName) {
+        document.getElementById(`img-value-${idSafeName}`).value = '';
+        document.getElementById(`file-input-${idSafeName}`).value = '';
+        document.getElementById(`img-empty-${idSafeName}`).classList.remove('hidden');
+        const libBtn = document.getElementById(`img-lib-btn-${idSafeName}`);
+        if (libBtn) libBtn.classList.remove('hidden');
+        document.getElementById(`img-filled-${idSafeName}`).classList.add('hidden');
+    }
+
+    async function handleSingletonImageUploadLocal(event, idSafeName) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const emptyState = document.getElementById(`img-empty-${idSafeName}`);
+        const filledState = document.getElementById(`img-filled-${idSafeName}`);
+        const progContainer = document.getElementById(`img-progress-container-${idSafeName}`);
+        const progBar = document.getElementById(`img-progress-bar-${idSafeName}`);
+        const progText = document.getElementById(`img-progress-text-${idSafeName}`);
+        const previewImg = document.getElementById(`img-preview-${idSafeName}`);
+        const filenameText = document.getElementById(`img-filename-${idSafeName}`);
+        const inputVal = document.getElementById(`img-value-${idSafeName}`);
+        const libBtn = document.getElementById(`img-lib-btn-${idSafeName}`);
+
+        emptyState.classList.add('hidden');
+        if (libBtn) libBtn.classList.add('hidden');
+        progContainer.classList.remove('hidden');
+        progBar.style.width = '0%';
+        progText.textContent = '0%';
+
+        try {
+            const assetRef = await uploadAssetFile(file, (percent) => {
+                progBar.style.width = `${percent}%`;
+                progText.textContent = `${percent}%`;
+            });
+            
+            inputVal.value = assetRef;
+            previewImg.src = buildSanityImageUrl(assetRef);
+            filenameText.textContent = file.name;
+            
+            progContainer.classList.add('hidden');
+            filledState.classList.remove('hidden');
+            showToast('Image uploaded successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to upload image:', err);
+            showToast(err.message || 'Image upload failed.', 'error');
+            emptyState.classList.remove('hidden');
+            if (libBtn) libBtn.classList.remove('hidden');
+            progContainer.classList.add('hidden');
+        }
+    }
+
+    function renderSingletonImageField(name, label, currentValue, description = '') {
+        const hasImg = !!currentValue;
+        const imgUrl = hasImg ? (currentValue.startsWith('http') || currentValue.startsWith('assets/') ? currentValue : buildSanityImageUrl(currentValue)) : '';
+        const idSafeName = name.replace(/[\[\]\.]/g, '-');
+        
+        return `
+        <div class="space-y-2">
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">${escapeHtml(label)}</label>
+            ${description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(description)}</p>` : ''}
+            <div id="img-dropzone-container-${idSafeName}" class="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/30 rounded-xl p-5 transition duration-200 relative group">
+                <input type="hidden" name="${name}" id="img-value-${idSafeName}" value="${escapeHtml(currentValue || '')}">
+                
+                <div id="img-empty-${idSafeName}" class="${hasImg ? 'hidden' : ''} flex flex-col items-center gap-1.5 cursor-pointer w-full text-center" onclick="document.getElementById('file-input-${idSafeName}').click()">
+                    <div class="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-indigo-500 transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-700">Drag & drop or click to upload</p>
+                    <p class="text-[8px] text-slate-400">JPG, PNG, WebP — max 10MB</p>
+                </div>
+
+                <button type="button" onclick="event.stopPropagation(); chooseSingletonImageFromLibrary('${name}', '${idSafeName}')" class="mt-2 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-extrabold text-indigo-600 shadow-sm transition flex items-center gap-1.5 z-10 ${hasImg ? 'hidden' : ''}" id="img-lib-btn-${idSafeName}">
+                    <i class="fa-solid fa-images text-[9px]"></i> Select from Library
+                </button>
+
+                <div id="img-progress-container-${idSafeName}" class="hidden w-full flex flex-col gap-1 px-4">
+                    <div class="flex justify-between text-[8px] font-extrabold text-indigo-600 uppercase tracking-wide">
+                        <span>Uploading to Sanity...</span>
+                        <span id="img-progress-text-${idSafeName}">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div id="img-progress-bar-${idSafeName}" class="bg-gradient-to-r from-blue-400 to-indigo-500 h-1.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="img-filled-${idSafeName}" class="${hasImg ? '' : 'hidden'} flex items-center gap-4 w-full bg-white p-3 rounded-lg border border-slate-100 shadow-sm relative">
+                    <div class="relative group cursor-pointer" onclick="showImageLightbox('${imgUrl}', '${escapeHtml(label)}')">
+                        <img id="img-preview-${idSafeName}" src="${imgUrl}" class="w-16 h-16 object-cover rounded-md border border-slate-100 group-hover:opacity-75 transition">
+                        <div class="absolute inset-0 bg-black/40 rounded-md opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[10px] font-bold text-slate-700 truncate" id="img-filename-${idSafeName}">${hasImg ? 'Selected Image' : 'Uploaded Image'}</p>
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
+                            <button type="button" onclick="document.getElementById('file-input-${idSafeName}').click()" class="text-[9px] font-extrabold text-slate-500 hover:text-slate-800 flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-up-from-bracket text-[9px]"></i> Upload New
+                            </button>
+                            <button type="button" onclick="chooseSingletonImageFromLibrary('${name}', '${idSafeName}')" class="text-[9px] font-extrabold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                <i class="fa-solid fa-images text-[9px]"></i> From Library
+                            </button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearSingletonImageField('${idSafeName}')" class="text-slate-300 hover:text-rose-500 p-1.5 rounded-md hover:bg-slate-50 transition">
+                        <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    </button>
+                </div>
+
+                <input type="file" id="file-input-${idSafeName}" accept="image/*" class="hidden" onchange="handleSingletonImageUploadLocal(event, '${idSafeName}')">
+            </div>
+        </div>`;
+    }
+
+    // --- CHIP ARRAY HELPERS ---
+    function removeChip(idSafeName, idx) {
+        const hiddenInput = document.getElementById(`hidden-${idSafeName}`);
+        let arr = [];
+        try {
+            arr = JSON.parse(hiddenInput.value || '[]');
+        } catch (e) {}
+        arr.splice(idx, 1);
+        hiddenInput.value = JSON.stringify(arr);
+        renderChipsUI(idSafeName, arr);
+    }
+
+    function handleChipInput(event, idSafeName) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const input = event.target;
+            const val = input.value.trim();
+            if (val) {
+                const hiddenInput = document.getElementById(`hidden-${idSafeName}`);
+                let arr = [];
+                try {
+                    arr = JSON.parse(hiddenInput.value || '[]');
+                } catch (e) {}
+                if (!arr.includes(val)) {
+                    arr.push(val);
+                    hiddenInput.value = JSON.stringify(arr);
+                    renderChipsUI(idSafeName, arr);
+                }
+            }
+            input.value = '';
+        }
+    }
+
+    function renderChipsUI(idSafeName, arr) {
+        const listEl = document.querySelector(`#chip-container-${idSafeName} .chips-list`);
+        if (!listEl) return;
+        listEl.innerHTML = arr.map((item, idx) => `
+            <span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-600 border border-indigo-100/50 text-xs px-2.5 py-1 rounded-full font-medium">
+                <span>${escapeHtml(item)}</span>
+                <button type="button" class="text-indigo-400 hover:text-indigo-600 transition" onclick="removeChip('${idSafeName}', ${idx})">
+                    <i class="fa-solid fa-xmark text-[10px]"></i>
+                </button>
+            </span>
+        `).join('');
+    }
+
+    // --- ICON PICKER HELPERS ---
+    function renderIconPicker(name, label, currentValue, description = '') {
+        const idSafeName = name.replace(/[\[\]\.]/g, '-');
+        const iconsList = [
+            // Social Brands
+            "fa-brands fa-facebook", "fa-brands fa-twitter", "fa-brands fa-instagram", "fa-brands fa-linkedin", "fa-brands fa-youtube", "fa-brands fa-tiktok", "fa-brands fa-github",
+            // Medical / Health
+            "fa-solid fa-pills", "fa-solid fa-capsules", "fa-solid fa-vial", "fa-solid fa-stethoscope", "fa-solid fa-user-doctor", "fa-solid fa-heart-pulse", "fa-solid fa-brain", "fa-solid fa-lungs", "fa-solid fa-bone", "fa-solid fa-x-ray", "fa-solid fa-tablets", "fa-solid fa-hand-holding-medical", "fa-solid fa-file-shield", "fa-solid fa-shield-halved",
+            // Logistics & Business
+            "fa-solid fa-truck-fast", "fa-solid fa-truck-ramp-box", "fa-solid fa-handshake", "fa-solid fa-building-columns", "fa-solid fa-box-open", "fa-solid fa-cart-shopping", "fa-solid fa-boxes-stacked", "fa-solid fa-globe", "fa-solid fa-hand-holding-heart", "fa-solid fa-building", "fa-solid fa-house",
+            // General UI
+            "fa-solid fa-phone", "fa-solid fa-envelope", "fa-solid fa-location-dot", "fa-solid fa-mobile-screen-button", "fa-solid fa-clock", "fa-solid fa-user-shield", "fa-solid fa-medal", "fa-solid fa-star", "fa-solid fa-heart", "fa-solid fa-gear", "fa-solid fa-flag", "fa-solid fa-circle-question", "fa-solid fa-comments"
+        ];
+
+        const hasSelected = iconsList.includes(currentValue);
+        const activeIcon = hasSelected ? currentValue : 'fa-solid fa-icons';
+        const displayLabel = hasSelected ? currentValue.split(' ').pop().replace('fa-', '') : 'Select an Icon';
+
+        return `
+        <div class="space-y-2 relative" id="icon-picker-root-${idSafeName}">
+            <label class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">${escapeHtml(label)}</label>
+            ${description ? `<p class="text-[10px] text-slate-400 mb-1.5">${escapeHtml(description)}</p>` : ''}
+            
+            <input type="hidden" name="${name}" id="icon-value-${idSafeName}" value="${escapeHtml(currentValue || '')}">
+            
+            <button type="button" onclick="toggleIconPickerDropdown('${idSafeName}')" class="w-full flex items-center justify-between border border-slate-200 hover:border-indigo-400 rounded-lg px-4 py-2.5 text-sm bg-white text-slate-700 shadow-sm transition duration-200">
+                <div class="flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/50" id="icon-preview-btn-${idSafeName}">
+                        <i class="${activeIcon} text-base"></i>
+                    </span>
+                    <span class="font-medium text-slate-700 capitalize text-xs" id="icon-label-btn-${idSafeName}">${escapeHtml(displayLabel)}</span>
+                </div>
+                <i class="fa-solid fa-chevron-down text-slate-400 text-xs"></i>
+            </button>
+
+            <div id="icon-dropdown-${idSafeName}" class="hidden absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-4 space-y-3 max-h-[320px] overflow-y-auto">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass text-slate-400 text-xs absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" placeholder="Search icons..." oninput="filterIconPicker(event, '${idSafeName}')" class="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 focus:border-indigo-400 focus:outline-none rounded-lg bg-slate-50/50 focus:bg-white transition">
+                </div>
+                
+                <div class="grid grid-cols-6 gap-2" id="icon-grid-${idSafeName}">
+                    ${iconsList.map(icon => {
+                        const isSelected = icon === currentValue;
+                        const iconCleanName = icon.split(' ').pop().replace('fa-', '');
+                        return `
+                        <button type="button" title="${iconCleanName}" onclick="selectIcon('${idSafeName}', '${icon}')" class="icon-item flex flex-col items-center justify-center aspect-square p-2 border ${isSelected ? 'border-indigo-500 bg-indigo-50 text-indigo-600' : 'border-slate-100 bg-white hover:bg-slate-50 text-slate-500'} rounded-lg transition-all" data-icon-search="${icon}">
+                            <i class="${icon} text-lg"></i>
+                            <span class="text-[8px] text-slate-400 mt-1 truncate w-full text-center">${escapeHtml(iconCleanName)}</span>
+                        </button>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function toggleIconPickerDropdown(idSafeName) {
+        document.querySelectorAll('[id^="icon-dropdown-"]').forEach(drop => {
+            if (drop.id !== `icon-dropdown-${idSafeName}`) {
+                drop.classList.add('hidden');
+            }
+        });
+        const dropdown = document.getElementById(`icon-dropdown-${idSafeName}`);
+        if (dropdown) {
+            dropdown.classList.toggle('hidden');
+        }
+    }
+
+    function filterIconPicker(event, idSafeName) {
+        const query = event.target.value.toLowerCase().trim();
+        const grid = document.getElementById(`icon-grid-${idSafeName}`);
+        if (!grid) return;
+        const items = grid.querySelectorAll('.icon-item');
+        items.forEach(item => {
+            const searchVal = item.getAttribute('data-icon-search').toLowerCase();
+            if (searchVal.includes(query)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+
+    function selectIcon(idSafeName, iconClass) {
+        const inputVal = document.getElementById(`icon-value-${idSafeName}`);
+        const previewBtn = document.getElementById(`icon-preview-btn-${idSafeName}`);
+        const labelBtn = document.getElementById(`icon-label-btn-${idSafeName}`);
+        const dropdown = document.getElementById(`icon-dropdown-${idSafeName}`);
+
+        if (inputVal) inputVal.value = iconClass;
+        if (previewBtn) {
+            previewBtn.innerHTML = `<i class="${iconClass} text-base"></i>`;
+        }
+        if (labelBtn) {
+            const iconCleanName = iconClass.split(' ').pop().replace('fa-', '');
+            labelBtn.textContent = iconCleanName;
+        }
+        if (dropdown) dropdown.classList.add('hidden');
+
+        const grid = document.getElementById(`icon-grid-${idSafeName}`);
+        if (grid) {
+            const items = grid.querySelectorAll('.icon-item');
+            items.forEach(item => {
+                const itemIcon = item.getAttribute('data-icon-search');
+                if (itemIcon === iconClass) {
+                    item.className = 'icon-item flex flex-col items-center justify-center aspect-square p-2 border border-indigo-500 bg-indigo-50 text-indigo-600 rounded-lg transition-all';
+                } else {
+                    item.className = 'icon-item flex flex-col items-center justify-center aspect-square p-2 border border-slate-100 bg-white hover:bg-slate-50 text-slate-500 rounded-lg transition-all';
+                }
+            });
+        }
+    }
+
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('[id^="icon-picker-root-"]')) {
+            document.querySelectorAll('[id^="icon-dropdown-"]').forEach(drop => {
+                drop.classList.add('hidden');
+            });
+        }
+    });
+
+    function evaluateSingletonHiddenFields() {
+        const form = document.getElementById('singleton-form');
+        if (!form) return;
+        
+        const elements = form.querySelectorAll('[data-hidden-field]');
+        elements.forEach(el => {
+            const condField = el.getAttribute('data-hidden-field');
+            const condOp = el.getAttribute('data-hidden-op');
+            const condValStr = el.getAttribute('data-hidden-val');
+            
+            let condVal = condValStr;
+            if (condValStr === 'true') condVal = true;
+            else if (condValStr === 'false') condVal = false;
+            else if (/^-?\d+$/.test(condValStr)) condVal = parseInt(condValStr);
+            else if (/^-?\d+\.\d+$/.test(condValStr)) condVal = parseFloat(condValStr);
+            
+            const inputEl = form.querySelector(`[name="${condField}"]`);
+            let currentVal = undefined;
+            if (inputEl) {
+                if (inputEl.tagName === 'SELECT' && (inputEl.value === 'true' || inputEl.value === 'false')) {
+                    currentVal = inputEl.value === 'true';
+                } else if (inputEl.type === 'checkbox') {
+                    currentVal = inputEl.checked;
+                } else {
+                    currentVal = inputEl.value;
+                }
+            } else {
+                const imgVal = form.querySelector(`#img-value-${condField.replace(/[\[\]\.]/g, '-')}`);
+                if (imgVal) {
+                    currentVal = imgVal.value;
+                }
+            }
+            
+            let isHidden = false;
+            if (currentVal !== undefined) {
+                if (condOp === 'eq') {
+                    isHidden = (currentVal === condVal);
+                } else if (condOp === 'neq') {
+                    isHidden = (currentVal !== condVal);
+                }
+            }
+            
+            if (isHidden) {
+                el.classList.add('hidden');
+                const innerInput = el.querySelector('input, select, textarea');
+                if (innerInput) innerInput.removeAttribute('required');
+            } else {
+                el.classList.remove('hidden');
+            }
+        });
+    }
+
+    async function submitSingletonForm(event, collection, singletonId) {
+        event.preventDefault();
+        const form = document.getElementById('singleton-form');
+        const btn = document.getElementById('singleton-save-btn');
+        const alertEl = document.getElementById('singleton-alert');
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+        const formData = new FormData(form);
+        const payload = {};
+        const fields = FIELD_SCHEMAS[collection] || [];
+
+        formData.forEach((value, key) => {
+            const fieldDef = getFieldDefByPath(key, fields);
+            
+            let parsedVal = value;
+            if (fieldDef) {
+                if (fieldDef.type === 'number') {
+                    parsedVal = parseFloat(value) || 0;
+                } else if (fieldDef.type === 'select' && (value === 'true' || value === 'false')) {
+                    parsedVal = value === 'true';
+                } else if (fieldDef.type === 'chip_array') {
+                    try {
+                        parsedVal = JSON.parse(value);
+                    } catch(e) {
+                        parsedVal = [];
+                    }
+                } else if (fieldDef.type === 'image') {
+                    if (value) {
+                        parsedVal = {
+                            _type: 'image',
+                            asset: {
+                                _type: 'reference',
+                                _ref: value
+                            }
+                        };
+                    } else {
+                        parsedVal = null;
+                    }
+                }
+            }
+            
+            setNestedValue(payload, key, parsedVal);
+        });
+
+        try {
+            const res = await fetch(getAdminApiUrl(`document/${singletonId}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'Save failed.');
+            }
+
+            // Auto-publish after save
+            await fetch(getAdminApiUrl(`document/${singletonId}/publish`), { method: 'POST' });
+
+            alertEl.className = 'rounded-lg p-3 text-xs font-semibold mb-6 bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center gap-2';
+            alertEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Changes saved and published successfully.';
+            alertEl.classList.remove('hidden');
+            showToast('Changes saved successfully.', 'success');
+            setTimeout(() => alertEl.classList.add('hidden'), 3000);
+        } catch (err) {
+            alertEl.className = 'rounded-lg p-3 text-xs font-semibold mb-6 bg-rose-50 text-rose-500 border border-rose-200 flex items-center gap-2';
+            alertEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${escapeHtml(err.message)}`;
+            alertEl.classList.remove('hidden');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+        }
+    }
+
     function renderHeaderStats(activeCount) {
         const container = document.getElementById('header-stats-container');
         if (!container) return;
@@ -396,34 +1284,62 @@
             const session = JSON.parse(localStorage.getItem('getmeds_admin_session') || '{}');
             allowedCollections = session.allowedCollections || [];
             roleActionPerms = session.roleActionPerms || null;
-            // Security Officer — no content collections
             if (session.role === 'Security Officer') allowedCollections = [];
         } catch(e) {}
 
-        let html = ``;
-        Object.keys(COLLECTION_META).forEach(key => {
-            // RBAC Enforcement: Hide collection if role doesn't have at least read access
-            if (allowedCollections.length > 0 && !allowedCollections.includes(key)) return;
+        let html = '';
 
-            const meta = COLLECTION_META[key];
-            const isActive = activeFilter === key;
-
-            html += `
-                <a href="javascript:void(0)" onclick="setActiveFilter('${key}')" class="flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold ${
-                    isActive
-                        ? 'bg-slate-50 border-r-4 border-slate-900 text-slate-900'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                } transition duration-200">
-                    <div class="flex items-center gap-3">
-                        <i class="fa-solid ${meta.icon} text-sm"></i>
-                        <span>${meta.label}</span>
+        if (SIDEBAR_CONFIG.length > 0) {
+            // ── Grouped sidebar rendering ──
+            SIDEBAR_CONFIG.forEach((group, gIdx) => {
+                // Group header
+                html += `<div class="${gIdx > 0 ? 'mt-4 pt-3 border-t border-slate-100' : ''}">
+                    <div class="text-[9px] font-black uppercase tracking-wider text-slate-400/80 mb-2 px-3 flex items-center gap-2">
+                        <i class="fa-solid ${group.icon} text-[8px]"></i>
+                        <span>${escapeHtml(group.label)}</span>
                     </div>
-                </a>
-            `;
-        });
+                </div>`;
+
+                group.items.forEach(item => {
+                    if (allowedCollections.length > 0 && !allowedCollections.includes(item.key)) return;
+                    const isActive = activeFilter === item.key;
+
+                    html += `
+                        <a href="javascript:void(0)" onclick="setActiveFilter('${item.key}')" class="flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold ${
+                            isActive
+                                ? 'bg-slate-50 border-r-4 border-slate-900 text-slate-900'
+                                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                        } transition duration-200">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid ${item.icon} text-sm w-4 text-center"></i>
+                                <span>${escapeHtml(item.label)}</span>
+                            </div>
+                        </a>
+                    `;
+                });
+            });
+        } else {
+            // Fallback: flat list
+            Object.keys(COLLECTION_META).forEach(key => {
+                if (allowedCollections.length > 0 && !allowedCollections.includes(key)) return;
+                const meta = COLLECTION_META[key];
+                const isActive = activeFilter === key;
+                html += `
+                    <a href="javascript:void(0)" onclick="setActiveFilter('${key}')" class="flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold ${
+                        isActive
+                            ? 'bg-slate-50 border-r-4 border-slate-900 text-slate-900'
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                    } transition duration-200">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid ${meta.icon} text-sm"></i>
+                            <span>${meta.label}</span>
+                        </div>
+                    </a>
+                `;
+            });
+        }
         nav.innerHTML = html;
 
-        // Apply action-level enforcement for current collection
         if (roleActionPerms) {
             applyActionControlEnforcement(roleActionPerms);
         }
@@ -3245,6 +4161,7 @@
                 IMPORT_FIELD_SCHEMAS = data.import_field_schemas || {};
                 COLLECTION_META = data.collection_meta || {};
                 IMAGE_COLLECTIONS = data.image_collections || [];
+                SIDEBAR_CONFIG = data.sidebar_config || [];
                 window.sanityProjectId = data.sanity_project_id;
                 window.sanityDataset = data.sanity_dataset;
             }

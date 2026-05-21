@@ -35,44 +35,4 @@
     </div>
 </div>
 
-<!-- Beautiful Premium Glassmorphism Media Library Modal -->
-<div id="media-library-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center transition-all duration-300 opacity-0 pointer-events-none">
-    <div class="w-full max-w-[700px] bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 transform transition-all duration-300 scale-95 flex flex-col gap-4 h-[550px]">
-        
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 class="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-images text-[#0D99FF] text-base"></i> Sanity Media Asset Library
-            </h3>
-            <button onclick="closeMediaLibraryModal()" class="text-slate-400 hover:text-slate-600 transition">
-                <i class="fa-solid fa-xmark text-base"></i>
-            </button>
-        </div>
 
-        <!-- Quick filter / search media -->
-        <div class="flex items-center border border-slate-200 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 rounded-xl px-3 py-2 text-xs bg-white transition w-full">
-            <i class="fa-solid fa-magnifying-glass text-slate-400 mr-2"></i>
-            <input type="text" id="media-search" placeholder="Search uploaded images by filename..." oninput="filterMediaLibrary()" class="w-full focus:outline-none text-slate-700 bg-transparent">
-        </div>
-
-        <!-- Media Library Grid -->
-        <div class="flex-grow overflow-y-auto pr-1" id="media-library-scroll-container">
-            <div class="grid grid-cols-4 gap-3" id="media-library-grid">
-                <!-- Media files generated here -->
-            </div>
-            <div id="media-library-empty" class="hidden flex flex-col items-center justify-center py-16 text-slate-400">
-                <i class="fa-solid fa-box-open text-2xl mb-2"></i>
-                <p class="text-[10px] font-bold">No images found in your Sanity library.</p>
-            </div>
-            <div id="media-library-loading" class="flex flex-col items-center justify-center py-16 text-slate-400">
-                <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-[#0D99FF]"></i>
-                <p class="text-[10px] font-bold">Loading media assets...</p>
-            </div>
-        </div>
-
-        <div class="flex justify-end border-t border-slate-100 pt-3">
-            <button type="button" onclick="closeMediaLibraryModal()" class="px-4 py-2 border border-slate-200 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-50 transition shadow-sm">
-                Close
-            </button>
-        </div>
-    </div>
-</div>

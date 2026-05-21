@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import os
 from pathlib import Path
-from app.api.routes import chatbot, admin
+from app.api.routes import chatbot, admin, pages
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -46,6 +46,7 @@ app.add_middleware(
 # Include routers
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(pages.router, prefix="/api/pages", tags=["Pages"])
 
 from app.api.routes.admin import decode_access_token, decode_refresh_token
 

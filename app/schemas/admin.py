@@ -15,14 +15,3 @@ class ProductCreate(BaseModel):
     description: Optional[str] = Field("", description="Detailed product description")
     strength: Optional[str] = Field("", description="e.g. 100 MG / 16.7 ML")
     packaging: Optional[str] = Field("", description="e.g. Injection, Box")
-
-class ServiceCreate(BaseModel):
-    title: str = Field(..., description="Service title")
-    description: Optional[str] = Field("", description="Service description")
-    icon: Optional[str] = Field("fa-stethoscope", description="FontAwesome icon class")
-    link: Optional[str] = Field("/services", description="Redirect URL or local anchor path")
-
-class TeamCreate(BaseModel):
-    name: str = Field(..., description="Full name of staff member")
-    role: str = Field(..., description="Medical or executive role")
-    bio: Optional[str] = Field("", description="Short biographical background")

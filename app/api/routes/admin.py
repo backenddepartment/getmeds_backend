@@ -326,10 +326,10 @@ async def admin_auth_refresh(request: Request, response: Response):
     else:
         # Default or fallback role-matrix configuration
         if role == "Administrator":
-            allowed = ["product", "category", "heroSlide", "service", "dealOfDay", "categoryBanner", "team", "faq", "chatSession", "_security"]
+            allowed = ["product", "category", "faq", "chatSession", "siteSettings", "_security"]
             role_perms = {col: ['read', 'create', 'edit', 'delete'] for col in allowed}
         else:
-            allowed = ["product", "category", "heroSlide", "service", "dealOfDay", "categoryBanner", "team", "faq", "chatSession"]
+            allowed = ["product", "category", "faq", "chatSession", "siteSettings"]
             role_perms = {col: ['read', 'create', 'edit'] for col in allowed}
 
     return {
@@ -377,7 +377,7 @@ SUPPORTED_TYPES = DynamicListProxy()
 async def get_schemas():
     """
     Returns the complete dynamic schemas, including field configurations,
-    table column views, and import specs.
+    table column views, import specs, and sidebar hierarchy.
     """
     try:
         from app.core.config import get_settings
@@ -389,6 +389,7 @@ async def get_schemas():
             "import_field_schemas": schema_loader.get_import_field_schemas(),
             "collection_meta": schema_loader.get_collection_meta(),
             "image_collections": schema_loader.get_image_collections(),
+            "sidebar_config": schema_loader.get_sidebar_config(),
             "sanity_project_id": _settings.SANITY_PROJECT_ID,
             "sanity_dataset": _settings.SANITY_DATASET
         }
@@ -988,6 +989,7 @@ async def get_media_assets():
         return {
             "success": True,
             "data": assets,
+            "media": assets,
             "project_id": sanity_service.project_id,
             "dataset": sanity_service.dataset
         }

@@ -22,16 +22,36 @@ SYSTEM_SCHEMAS = {
 }
 
 COLLECTION_META_DEFAULTS = {
-    "product": { "label": 'Products', "icon": 'fa-pills', "badge": 'bg-blue-50 text-blue-600 border-blue-100/50' },
-    "category": { "label": 'Categories', "icon": 'fa-tags', "badge": 'bg-teal-50 text-teal-600 border-teal-100/50' },
-    "heroSlide": { "label": 'Hero Slides', "icon": 'fa-images', "badge": 'bg-amber-50 text-amber-600 border-amber-100/50' },
-    "service": { "label": 'Services', "icon": 'fa-stethoscope', "badge": 'bg-purple-50 text-purple-600 border-purple-100/50' },
-    "dealOfDay": { "label": 'Deals', "icon": 'fa-tag', "badge": 'bg-rose-50 text-rose-600 border-rose-100/50' },
-    "categoryBanner": { "label": 'Banners', "icon": 'fa-rectangle-ad', "badge": 'bg-indigo-50 text-indigo-600 border-indigo-100/50' },
-    "team": { "label": 'Team Members', "icon": 'fa-user-doctor', "badge": 'bg-emerald-50 text-emerald-600 border-emerald-100/50' },
-    "faq": { "label": 'FAQs', "icon": 'fa-circle-question', "badge": 'bg-sky-50 text-sky-600 border-sky-100/50' },
-    "chatSession": { "label": 'Chat Sessions', "icon": 'fa-comments', "badge": 'bg-slate-50 text-slate-600 border-slate-100/50' },
+    # ── Core Data (table/list view) ──
+    "product":    { "label": "Products",      "icon": "fa-pills",            "badge": "bg-blue-50 text-blue-600 border-blue-100/50",    "group": "core",     "viewType": "table" },
+    "category":   { "label": "Categories",    "icon": "fa-tags",             "badge": "bg-teal-50 text-teal-600 border-teal-100/50",    "group": "core",     "viewType": "table" },
+    "faq":        { "label": "FAQs",          "icon": "fa-circle-question",  "badge": "bg-sky-50 text-sky-600 border-sky-100/50",      "group": "core",     "viewType": "table" },
+    "chatSession":{ "label": "Chat Sessions", "icon": "fa-comments",         "badge": "bg-slate-50 text-slate-600 border-slate-100/50", "group": "core",     "viewType": "table" },
+
+    # ── Pages (singleton form editor) ──
+    "homePage":           { "label": "Home",                      "icon": "fa-house",          "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "home-page" },
+    "aboutPage":          { "label": "About Us",                  "icon": "fa-building",       "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "about-page" },
+    "servicesPage":       { "label": "Services",                  "icon": "fa-stethoscope",    "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "services-page" },
+    "contactPage":        { "label": "Contact",                   "icon": "fa-envelope",       "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "contact-page" },
+    "careersPage":        { "label": "Careers",                   "icon": "fa-briefcase",      "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "careers-page" },
+    "meditationsPage":    { "label": "Meditations",               "icon": "fa-spa",            "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "meditations-page" },
+    "orderMedicinesPage": { "label": "Order Medicines",           "icon": "fa-cart-shopping",  "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "order-medicines-page" },
+    "productsPage":       { "label": "Product Range",             "icon": "fa-boxes-stacked",  "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "products-page" },
+    "globalPresencePage": { "label": "Global Presence",           "icon": "fa-globe",          "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "global-presence-page" },
+    "csrPage":            { "label": "CSR",                       "icon": "fa-hand-holding-heart", "badge": "bg-violet-50 text-violet-600 border-violet-100/50", "group": "pages", "viewType": "singleton", "singletonId": "csr-page" },
+    "ungcPage":           { "label": "UNGC",                      "icon": "fa-flag",           "badge": "bg-violet-50 text-violet-600 border-violet-100/50",  "group": "pages", "viewType": "singleton", "singletonId": "ungc-page" },
+    "papPage":            { "label": "Patient Assistance Program","icon": "fa-hand-holding-medical", "badge": "bg-violet-50 text-violet-600 border-violet-100/50", "group": "pages", "viewType": "singleton", "singletonId": "pap-page" },
+
+    # ── Settings (singleton form editor) ──
+    "siteSettings":       { "label": "Site Settings",             "icon": "fa-gear",           "badge": "bg-amber-50 text-amber-600 border-amber-100/50",    "group": "settings", "viewType": "singleton", "singletonId": "global-site-settings" },
 }
+
+# Sidebar group definitions (order matters for rendering)
+SIDEBAR_GROUPS = [
+    { "key": "core",     "label": "Core Data", "icon": "fa-database" },
+    { "key": "pages",    "label": "Pages",     "icon": "fa-file-lines" },
+    { "key": "settings", "label": "Settings",  "icon": "fa-gear" },
+]
 
 def get_property_value(prop_name, text):
     pattern = r'\b' + prop_name + r'\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`|([a-zA-Z0-9_-]+))'
@@ -43,6 +63,196 @@ def get_property_value(prop_name, text):
         return val
     return None
 
+def parse_fields_from_block(fields_block):
+    field_blocks = []
+    brace_count = 0
+    block_start = -1
+    in_string = False
+    string_char = None
+    escaped = False
+    
+    i = 0
+    while i < len(fields_block):
+        char = fields_block[i]
+        if escaped:
+            escaped = False
+            i += 1
+            continue
+        if char == '\\':
+            escaped = True
+            i += 1
+            continue
+        if char in ('\'', '"', '`'):
+            if not in_string:
+                in_string = True
+                string_char = char
+            elif string_char == char:
+                in_string = False
+        elif not in_string:
+            if char == '{':
+                if brace_count == 0:
+                    block_start = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and block_start != -1:
+                    field_blocks.append(fields_block[block_start : i + 1])
+                    block_start = -1
+        i += 1
+    
+    fields = []
+    for fb in field_blocks:
+        f_name = get_property_value('name', fb)
+        f_title = get_property_value('title', fb)
+        f_type = get_property_value('type', fb)
+        f_desc = get_property_value('description', fb)
+        
+        is_req = False
+        if 'Rule.required()' in fb or 'Rule.custom' in fb:
+            is_req = True
+        
+        if f_name and f_type:
+            field_data = {
+                "name": f_name,
+                "label": f_title if f_title else f_name.capitalize(),
+                "type": f_type,
+                "required": is_req
+            }
+            if f_desc:
+                field_data["description"] = f_desc
+                
+            # Parse initial value
+            init_m = re.search(r'\binitialValue\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`|([^,\n\}]+))', fb)
+            if init_m:
+                val_str = init_m.group(1) or init_m.group(2) or init_m.group(3) or init_m.group(4)
+                val_str = val_str.strip()
+                if val_str == "true":
+                    val = True
+                elif val_str == "false":
+                    val = False
+                elif re.match(r'^-?\d+$', val_str):
+                    val = int(val_str)
+                elif re.match(r'^-?\d+\.\d+$', val_str):
+                    val = float(val_str)
+                else:
+                    val = val_str
+                field_data["initialValue"] = val
+
+            # Parse hidden condition
+            hidden_m = re.search(r'\bhidden\s*:\s*\(\{\s*parent\s*\}\)\s*=>\s*parent\?\.([a-zA-Z0-9_-]+)\s*(===|==|!==|!=)\s*(true|false|[\'"`][^\'"`]*[\'"`])', fb)
+            if hidden_m:
+                cond_field = hidden_m.group(1)
+                op = hidden_m.group(2)
+                val_str = hidden_m.group(3)
+                val_str = val_str.strip('\'"` ')
+                if val_str == "true":
+                    val = True
+                elif val_str == "false":
+                    val = False
+                elif re.match(r'^-?\d+$', val_str):
+                    val = int(val_str)
+                elif re.match(r'^-?\d+\.\d+$', val_str):
+                    val = float(val_str)
+                else:
+                    val = val_str
+                field_data["hidden_condition"] = {
+                    "field": cond_field,
+                    "operator": "eq" if op in ("===", "==") else "neq",
+                    "value": val
+                }
+                
+            if "options" in fb:
+                list_m = re.search(r'\blist\s*:\s*\[(.*?)\]', fb, flags=re.DOTALL)
+                if list_m:
+                    opts = []
+                    opt_items = re.findall(r'\{\s*title\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`)\s*,\s*value\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`)\s*\}', list_m.group(1))
+                    for match_groups in opt_items:
+                        title = match_groups[0] or match_groups[1] or match_groups[2]
+                        value = match_groups[3] or match_groups[4] or match_groups[5]
+                        opts.append({"value": value, "label": title})
+                    if opts:
+                        field_data["type"] = "select"
+                        field_data["options"] = opts
+            
+            if field_data["type"] == "reference":
+                to_m = re.search(r'\bto\s*:\s*\[\s*\{\s*type\s*:\s*[\'"`]([^\'"`]+)[\'"`]\s*\}\s*\]', fb)
+                if to_m:
+                    field_data["to"] = to_m.group(1)
+            
+            if field_data["type"] == "slug":
+                source_m = re.search(r'\bsource\s*:\s*[\'"`]([^\'"`]+)[\'"`]', fb)
+                if source_m:
+                    field_data["source"] = source_m.group(1)
+                    
+            if field_data["type"] == "object":
+                fields_start_nest = re.search(r'\bfields\s*:\s*\[', fb)
+                if fields_start_nest:
+                    bracket_count = 1
+                    nest_start = fields_start_nest.end()
+                    nest_end = -1
+                    for idx in range(nest_start, len(fb)):
+                        char = fb[idx]
+                        if char == '[':
+                            bracket_count += 1
+                        elif char == ']':
+                            bracket_count -= 1
+                            if bracket_count == 0:
+                                nest_end = idx
+                                break
+                    if nest_end != -1:
+                        nest_fields_block = fb[nest_start : nest_end]
+                        nested_fields_parsed = parse_fields_from_block(nest_fields_block)
+                        if nested_fields_parsed:
+                            field_data["of_type"] = "object"
+                            field_data["fields"] = nested_fields_parsed
+
+            if field_data["type"] == "array":
+                of_start = re.search(r'\bof\s*:\s*\[', fb)
+                if of_start:
+                    bracket_count = 1
+                    nest_start = of_start.end()
+                    nest_end = -1
+                    for idx in range(nest_start, len(fb)):
+                        char = fb[idx]
+                        if char == '[':
+                            bracket_count += 1
+                        elif char == ']':
+                            bracket_count -= 1
+                            if bracket_count == 0:
+                                nest_end = idx
+                                break
+                    if nest_end != -1:
+                        of_content = fb[nest_start : nest_end]
+                        if 'fields' in of_content:
+                            fields_start_nest = re.search(r'\bfields\s*:\s*\[', of_content)
+                            if fields_start_nest:
+                                bracket_count = 1
+                                nest_start = fields_start_nest.end()
+                                nest_end = -1
+                                for idx in range(nest_start, len(of_content)):
+                                    char = of_content[idx]
+                                    if char == '[':
+                                        bracket_count += 1
+                                    elif char == ']':
+                                        bracket_count -= 1
+                                        if bracket_count == 0:
+                                            nest_end = idx
+                                            break
+                                if nest_end != -1:
+                                    nest_fields_block = of_content[nest_start : nest_end]
+                                    nested_fields_parsed = parse_fields_from_block(nest_fields_block)
+                                    if nested_fields_parsed:
+                                        field_data["of_type"] = "object"
+                                        field_data["fields"] = nested_fields_parsed
+                        else:
+                            type_m = re.search(r'type\s*:\s*[\'"`]([^\'"`]+)[\'"`]', of_content)
+                            if type_m:
+                                of_type_name = type_m.group(1)
+                                if of_type_name in ("imageWithAlt", "metaFields", "linkItem"):
+                                    field_data["of_type"] = of_type_name
+            fields.append(field_data)
+    return fields
+
 def parse_ts_schema(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -51,12 +261,15 @@ def parse_ts_schema(file_path):
         print(f"Error reading schema file {file_path}: {e}")
         return None
     
-    # Remove comments
     content = re.sub(r'//.*', '', content)
     content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
     
     doc_name = get_property_value('name', content)
     if not doc_name:
+        return None
+    
+    doc_type = get_property_value('type', content)
+    if doc_type and doc_type != 'document':
         return None
         
     doc_title = get_property_value('title', content) or doc_name.capitalize()
@@ -78,263 +291,8 @@ def parse_ts_schema(file_path):
                     break
         if end_idx != -1:
             fields_block = content[start_idx + 1 : end_idx]
+            fields = parse_fields_from_block(fields_block)
             
-            field_blocks = []
-            brace_count = 0
-            block_start = -1
-            in_string = False
-            string_char = None
-            escaped = False
-            
-            i = 0
-            while i < len(fields_block):
-                char = fields_block[i]
-                if escaped:
-                    escaped = False
-                    i += 1
-                    continue
-                if char == '\\':
-                    escaped = True
-                    i += 1
-                    continue
-                if char in ('\'', '"', '`'):
-                    if not in_string:
-                        in_string = True
-                        string_char = char
-                    elif string_char == char:
-                        in_string = False
-                elif not in_string:
-                    if char == '{':
-                        if brace_count == 0:
-                            block_start = i
-                        brace_count += 1
-                    elif char == '}':
-                        brace_count -= 1
-                        if brace_count == 0 and block_start != -1:
-                            field_blocks.append(fields_block[block_start : i + 1])
-                            block_start = -1
-                i += 1
-            
-            for fb in field_blocks:
-                f_name = get_property_value('name', fb)
-                f_title = get_property_value('title', fb)
-                f_type = get_property_value('type', fb)
-                f_desc = get_property_value('description', fb)
-                
-                is_req = False
-                if 'Rule.required()' in fb or 'Rule.custom' in fb:
-                    is_req = True
-                
-                if f_name and f_type:
-                    field_data = {
-                        "name": f_name,
-                        "label": f_title if f_title else f_name.capitalize(),
-                        "type": f_type,
-                        "required": is_req
-                    }
-                    if f_desc:
-                        field_data["description"] = f_desc
-                        
-                    # Parse initial value
-                    init_m = re.search(r'\binitialValue\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`|([^,\n\}]+))', fb)
-                    if init_m:
-                        val_str = init_m.group(1) or init_m.group(2) or init_m.group(3) or init_m.group(4)
-                        val_str = val_str.strip()
-                        if val_str == "true":
-                            val = True
-                        elif val_str == "false":
-                            val = False
-                        elif re.match(r'^-?\d+$', val_str):
-                            val = int(val_str)
-                        elif re.match(r'^-?\d+\.\d+$', val_str):
-                            val = float(val_str)
-                        else:
-                            val = val_str
-                        field_data["initialValue"] = val
-
-                    # Parse hidden condition
-                    hidden_m = re.search(r'\bhidden\s*:\s*\(\{\s*parent\s*\}\)\s*=>\s*parent\?\.([a-zA-Z0-9_-]+)\s*(===|==|!==|!=)\s*(true|false|[\'"`][^\'"`]*[\'"`])', fb)
-                    if hidden_m:
-                        cond_field = hidden_m.group(1)
-                        op = hidden_m.group(2)
-                        val_str = hidden_m.group(3)
-                        val_str = val_str.strip('\'"` ')
-                        if val_str == "true":
-                            val = True
-                        elif val_str == "false":
-                            val = False
-                        elif re.match(r'^-?\d+$', val_str):
-                            val = int(val_str)
-                        elif re.match(r'^-?\d+\.\d+$', val_str):
-                            val = float(val_str)
-                        else:
-                            val = val_str
-                        field_data["hidden_condition"] = {
-                            "field": cond_field,
-                            "operator": "eq" if op in ("===", "==") else "neq",
-                            "value": val
-                        }
-                        
-                    if "options" in fb:
-                        list_m = re.search(r'\blist\s*:\s*\[(.*?)\]', fb, flags=re.DOTALL)
-                        if list_m:
-                            opts = []
-                            opt_items = re.findall(r'\{\s*title\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`)\s*,\s*value\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`)\s*\}', list_m.group(1))
-                            for match_groups in opt_items:
-                                title = match_groups[0] or match_groups[1] or match_groups[2]
-                                value = match_groups[3] or match_groups[4] or match_groups[5]
-                                opts.append({"value": value, "label": title})
-                            if opts:
-                                field_data["type"] = "select"
-                                field_data["options"] = opts
-                    
-                    if field_data["type"] == "reference":
-                        to_m = re.search(r'\bto\s*:\s*\[\s*\{\s*type\s*:\s*[\'"`]([^\'"`]+)[\'"`]\s*\}\s*\]', fb)
-                        if to_m:
-                            field_data["to"] = to_m.group(1)
-                    
-                    if field_data["type"] == "slug":
-                        source_m = re.search(r'\bsource\s*:\s*[\'"`]([^\'"`]+)[\'"`]', fb)
-                        if source_m:
-                            field_data["source"] = source_m.group(1)
-                            
-                    if field_data["type"] == "array":
-                        of_start = re.search(r'\bof\s*:\s*\[', fb)
-                        if of_start:
-                            bracket_count = 1
-                            nest_start = of_start.end()
-                            nest_end = -1
-                            for idx in range(nest_start, len(fb)):
-                                char = fb[idx]
-                                if char == '[':
-                                    bracket_count += 1
-                                elif char == ']':
-                                    bracket_count -= 1
-                                    if bracket_count == 0:
-                                        nest_end = idx
-                                        break
-                            if nest_end != -1:
-                                of_content = fb[nest_start : nest_end]
-                                if 'fields' in of_content:
-                                    fields_start_nest = re.search(r'\bfields\s*:\s*\[', of_content)
-                                    if fields_start_nest:
-                                        bracket_count = 0
-                                        nest_start = fields_start_nest.end() - 1
-                                        nest_end = -1
-                                        for idx in range(nest_start, len(of_content)):
-                                            char = of_content[idx]
-                                            if char == '[':
-                                                bracket_count += 1
-                                            elif char == ']':
-                                                bracket_count -= 1
-                                                if bracket_count == 0:
-                                                    nest_end = idx
-                                                    break
-                                        if nest_end != -1:
-                                            nest_fields_block = of_content[nest_start + 1 : nest_end]
-                                            n_field_blocks = []
-                                            n_brace_count = 0
-                                            n_block_start = -1
-                                            n_in_string = False
-                                            n_string_char = None
-                                            n_escaped = False
-                                            j = 0
-                                            while j < len(nest_fields_block):
-                                                char = nest_fields_block[j]
-                                                if n_escaped:
-                                                    n_escaped = False
-                                                    j += 1
-                                                    continue
-                                                if char == '\\':
-                                                    n_escaped = True
-                                                    j += 1
-                                                    continue
-                                                if char in ('\'', '"', '`'):
-                                                    if not n_in_string:
-                                                        n_in_string = True
-                                                        n_string_char = char
-                                                    elif n_string_char == char:
-                                                        n_in_string = False
-                                                elif not n_in_string:
-                                                    if char == '{':
-                                                        if n_brace_count == 0:
-                                                            n_block_start = j
-                                                        n_brace_count += 1
-                                                    elif char == '}':
-                                                        n_brace_count -= 1
-                                                        if n_brace_count == 0 and n_block_start != -1:
-                                                            n_field_blocks.append(nest_fields_block[n_block_start : j + 1])
-                                                            n_block_start = -1
-                                                j += 1
-                                            
-                                            nested_fields_parsed = []
-                                            for nfb in n_field_blocks:
-                                                nf_name = get_property_value('name', nfb)
-                                                nf_title = get_property_value('title', nfb)
-                                                nf_type = get_property_value('type', nfb)
-                                                nf_desc = get_property_value('description', nfb)
-                                                nf_req = 'Rule.required()' in nfb or 'Rule.custom' in nfb
-                                                
-                                                if nf_name and nf_type:
-                                                    nf_data = {
-                                                        "name": nf_name,
-                                                        "label": nf_title if nf_title else nf_name.capitalize(),
-                                                        "type": nf_type,
-                                                        "required": nf_req
-                                                    }
-                                                    if nf_desc:
-                                                        nf_data["description"] = nf_desc
-                                                        
-                                                    # Parse nested initial value
-                                                    ninit_m = re.search(r'\binitialValue\s*:\s*(?:\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`|([^,\n\}]+))', nfb)
-                                                    if ninit_m:
-                                                        nval_str = ninit_m.group(1) or ninit_m.group(2) or ninit_m.group(3) or ninit_m.group(4)
-                                                        nval_str = nval_str.strip()
-                                                        if nval_str == "true":
-                                                            nval = True
-                                                        elif nval_str == "false":
-                                                            nval = False
-                                                        elif re.match(r'^-?\d+$', nval_str):
-                                                            nval = int(nval_str)
-                                                        elif re.match(r'^-?\d+\.\d+$', nval_str):
-                                                            nval = float(nval_str)
-                                                        else:
-                                                            nval = nval_str
-                                                        nf_data["initialValue"] = nval
-
-                                                    # Parse nested hidden condition
-                                                    nhidden_m = re.search(r'\bhidden\s*:\s*\(\{\s*parent\s*\}\)\s*=>\s*parent\?\.([a-zA-Z0-9_-]+)\s*(===|==|!==|!=)\s*(true|false|[\'"`][^\'"`]*[\'"`])', nfb)
-                                                    if nhidden_m:
-                                                        ncond_field = nhidden_m.group(1)
-                                                        nop = nhidden_m.group(2)
-                                                        nval_str = nhidden_m.group(3)
-                                                        nval_str = nval_str.strip('\'"` ')
-                                                        if nval_str == "true":
-                                                            nval = True
-                                                        elif nval_str == "false":
-                                                            nval = False
-                                                        elif re.match(r'^-?\d+$', nval_str):
-                                                            nval = int(nval_str)
-                                                        elif re.match(r'^-?\d+\.\d+$', nval_str):
-                                                            nval = float(nval_str)
-                                                        else:
-                                                            nval = nval_str
-                                                        nf_data["hidden_condition"] = {
-                                                            "field": ncond_field,
-                                                            "operator": "eq" if nop in ("===", "==") else "neq",
-                                                            "value": nval
-                                                        }
-                                                    if nf_type == "reference":
-                                                        nto_m = re.search(r'\bto\s*:\s*\[\s*\{\s*type\s*:\s*[\'"`]([^\'"`]+)[\'"`]\s*\}\s*\]', nfb)
-                                                        if nto_m:
-                                                            nf_data["to"] = nto_m.group(1)
-                                                    nested_fields_parsed.append(nf_data)
-                                            if nested_fields_parsed:
-                                                field_data["of_type"] = "object"
-                                                field_data["fields"] = nested_fields_parsed
-                    
-                    fields.append(field_data)
-                    
     return {
         "name": doc_name,
         "title": doc_title,
@@ -362,11 +320,12 @@ class SchemaLoader:
         parsed_list = []
         if os.path.exists(schema_dir) and os.path.isdir(schema_dir):
             try:
-                for f in os.listdir(schema_dir):
-                    if f.endswith('.ts') and f != 'index.ts':
-                        parsed = parse_ts_schema(os.path.join(schema_dir, f))
-                        if parsed:
-                            parsed_list.append(parsed)
+                for root, dirs, files in os.walk(schema_dir):
+                    for f in files:
+                        if f.endswith('.ts') and f != 'index.ts':
+                            parsed = parse_ts_schema(os.path.join(root, f))
+                            if parsed:
+                                parsed_list.append(parsed)
             except Exception as e:
                 print(f"WARNING: Dynamic schema parsing failed: {e}. Falling back to cache.")
 
@@ -400,18 +359,14 @@ class SchemaLoader:
         base_map = {
             "product": "GMP0000-",
             "category": "GMC0000-",
-            "heroSlide": "GMH0000-",
-            "service": "GMS0000-",
-            "dealOfDay": "GMD0000-",
-            "categoryBanner": "GMB0000-",
-            "team": "GMT0000-",
             "faq": "GMF0000-",
             "chatSession": "GMX0000-",
+            "siteSettings": "GMSS0000-",
             "adminUser": "GMAU0000-",
             "securityLog": "GMSL0000-",
             "accessPoint": "GMAP0000-"
         }
-        # Add dynamic maps
+        # Add dynamic maps for any new schemas
         for s in self.schemas:
             name = s["name"]
             if name not in base_map:
@@ -430,103 +385,121 @@ class SchemaLoader:
 
     def get_field_schemas(self):
         fs = {}
+        
+        # Predefined expansions for shared object types
+        SHARED_EXPANSIONS = {
+            "metaFields": [
+                {"name": "title", "label": "Meta Title", "type": "text"},
+                {"name": "description", "label": "Meta Description", "type": "textarea"}
+            ],
+            "imageWithAlt": [
+                {"name": "src", "label": "Image Path", "type": "image_path"},
+                {"name": "alt", "label": "Alt Text", "type": "text"}
+            ],
+            "linkItem": [
+                {"name": "label", "label": "Label", "type": "text"},
+                {"name": "href", "label": "URL", "type": "text"}
+            ]
+        }
+        
+        def map_field_definition(f, parent_name):
+            ftype = f["type"]
+            mapped_field = {
+                "name": f["name"],
+                "label": f["label"],
+                "required": f.get("required", False)
+            }
+            if "description" in f:
+                mapped_field["description"] = f["description"]
+            if "initialValue" in f:
+                mapped_field["initialValue"] = f["initialValue"]
+            if "hidden_condition" in f:
+                mapped_field["hidden_condition"] = f["hidden_condition"]
+            
+            # 1. Custom Shared Types
+            if ftype in SHARED_EXPANSIONS:
+                mapped_field["type"] = "object"
+                mapped_field["schemaType"] = ftype
+                mapped_field["fields"] = SHARED_EXPANSIONS[ftype]
+                
+            # 2. Object Type
+            elif ftype == "object":
+                mapped_field["type"] = "object"
+                mapped_field["schemaType"] = "object"
+                nested_mapped = []
+                for nf in f.get("fields", []):
+                    nested_mapped.append(map_field_definition(nf, parent_name))
+                mapped_field["fields"] = nested_mapped
+                
+            # 3. Simple Types
+            elif ftype == "string":
+                name_lower = f["name"].lower()
+                if f["name"] == "icon" or f["name"].endswith("Icon"):
+                    mapped_field["type"] = "icon_select"
+                elif any(kw in name_lower for kw in ("image", "logo", "banner", "pic", "photo", "avatar", "bg")) or f["name"].endswith("Src") or f["name"] == "src":
+                    if "alt" not in name_lower:
+                        mapped_field["type"] = "image_path"
+                    else:
+                        mapped_field["type"] = "text"
+                else:
+                    mapped_field["type"] = "text"
+            elif ftype == "slug":
+                mapped_field["type"] = "slug"
+                mapped_field["source"] = f.get("source", "name")
+            elif ftype == "image":
+                mapped_field["type"] = "image"
+            elif ftype == "text":
+                mapped_field["type"] = "textarea"
+            elif ftype == "number":
+                mapped_field["type"] = "number"
+                mapped_field["step"] = "0.01"
+            elif ftype == "boolean":
+                mapped_field["type"] = "select"
+                if f["name"] == "availability":
+                    mapped_field["options"] = [{"value": "true", "label": "In Stock"}, {"value": "false", "label": "Out of Stock"}]
+                else:
+                    mapped_field["options"] = [{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}]
+            elif ftype == "select":
+                mapped_field["type"] = "select"
+                mapped_field["options"] = f.get("options", [])
+            elif ftype == "reference":
+                target = f.get("to", "")
+                if parent_name == "product" and f["name"] == "category":
+                    mapped_field["type"] = "category_select"
+                else:
+                    mapped_field["type"] = "reference_select"
+                    mapped_field["to"] = target
+            elif parent_name == "product" and f["name"] == "subCategory":
+                mapped_field["type"] = "subcategory_select"
+                
+            # 4. Array Type
+            elif ftype == "array":
+                of_type = f.get("of_type")
+                if of_type == "object":
+                    mapped_field["type"] = "object_array"
+                    mapped_field["schemaType"] = "object"
+                    nested_mapped = []
+                    for nf in f.get("fields", []):
+                        nested_mapped.append(map_field_definition(nf, parent_name))
+                    mapped_field["fields"] = nested_mapped
+                elif of_type in SHARED_EXPANSIONS:
+                    mapped_field["type"] = "object_array"
+                    mapped_field["schemaType"] = of_type
+                    mapped_field["fields"] = SHARED_EXPANSIONS[of_type]
+                else:
+                    mapped_field["type"] = "chip_array"
+                    mapped_field["placeholder"] = "Press Enter to add tag/chip"
+                    mapped_field["is_array"] = True
+            else:
+                mapped_field["type"] = "text"
+                
+            return mapped_field
+            
         for s in self.schemas:
             name = s["name"]
             fields_mapped = []
             for f in s["fields"]:
-                ftype = f["type"]
-                mapped_field = {
-                    "name": f["name"],
-                    "label": f["label"],
-                    "required": f.get("required", False)
-                }
-                if "description" in f:
-                    mapped_field["description"] = f["description"]
-                if "initialValue" in f:
-                    mapped_field["initialValue"] = f["initialValue"]
-                if "hidden_condition" in f:
-                    mapped_field["hidden_condition"] = f["hidden_condition"]
-                
-                # Type mappings
-                if ftype == "string":
-                    mapped_field["type"] = "text"
-                elif ftype == "slug":
-                    mapped_field["type"] = "slug"
-                    mapped_field["source"] = f.get("source", "name")
-                elif ftype == "image":
-                    mapped_field["type"] = "image"
-                elif ftype == "text":
-                    mapped_field["type"] = "textarea"
-                elif ftype == "number":
-                    mapped_field["type"] = "number"
-                    mapped_field["step"] = "0.01"
-                elif ftype == "boolean":
-                    mapped_field["type"] = "select"
-                    # Default boolean options
-                    if f["name"] == "availability":
-                        mapped_field["options"] = [{"value": "true", "label": "In Stock"}, {"value": "false", "label": "Out of Stock"}]
-                    else:
-                        mapped_field["options"] = [{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}]
-                elif ftype == "select":
-                    mapped_field["type"] = "select"
-                    mapped_field["options"] = f.get("options", [])
-                elif ftype == "reference":
-                    target = f.get("to", "")
-                    if name == "product" and f["name"] == "category":
-                        mapped_field["type"] = "category_select"
-                    else:
-                        mapped_field["type"] = "reference_select"
-                        mapped_field["to"] = target
-                elif name == "product" and f["name"] == "subCategory":
-                    mapped_field["type"] = "subcategory_select"
-                elif ftype == "array":
-                    if f.get("of_type") == "object":
-                        mapped_field["type"] = "object_array"
-                        # Map nested fields
-                        nested_mapped = []
-                        for nf in f.get("fields", []):
-                            nftype = nf["type"]
-                            n_mapped = {
-                                "name": nf["name"],
-                                "label": nf["label"],
-                                "required": nf.get("required", False)
-                            }
-                            if "description" in nf:
-                                n_mapped["description"] = nf["description"]
-                            if "initialValue" in nf:
-                                n_mapped["initialValue"] = nf["initialValue"]
-                            if "hidden_condition" in nf:
-                                n_mapped["hidden_condition"] = nf["hidden_condition"]
-                            if nftype == "string":
-                                n_mapped["type"] = "text"
-                            elif nftype == "slug":
-                                n_mapped["type"] = "slug"
-                                n_mapped["source"] = nf.get("source", "name")
-                            elif nftype == "image":
-                                n_mapped["type"] = "image"
-                            elif nftype == "text":
-                                n_mapped["type"] = "textarea"
-                            elif nftype == "number":
-                                n_mapped["type"] = "number"
-                                n_mapped["step"] = "0.01"
-                            elif nftype == "boolean":
-                                n_mapped["type"] = "select"
-                                n_mapped["options"] = [{"value": "true", "label": "Yes"}, {"value": "false", "label": "No"}]
-                            elif nftype == "reference":
-                                n_mapped["type"] = "reference_select"
-                                n_mapped["to"] = nf.get("to", "")
-                            else:
-                                n_mapped["type"] = "text"
-                            nested_mapped.append(n_mapped)
-                        mapped_field["fields"] = nested_mapped
-                    else:
-                        mapped_field["type"] = "text"
-                        mapped_field["placeholder"] = "Comma-separated values (e.g. tag1, tag2)"
-                        mapped_field["is_array"] = True
-                else:
-                    mapped_field["type"] = "text"
-                
-                fields_mapped.append(mapped_field)
+                fields_mapped.append(map_field_definition(f, name))
             fs[name] = fields_mapped
 
         # Append system security schemas
@@ -602,12 +575,54 @@ class SchemaLoader:
         for s in self.schemas:
             name = s["name"]
             if name not in meta:
+                # Auto-detect: page schemas go to "pages" group as singletons
+                is_page = name.endswith("Page")
                 meta[name] = {
-                    "label": s["title"] + "s" if not s["title"].endswith("s") else s["title"],
-                    "icon": "fa-database",
-                    "badge": "bg-slate-50 text-slate-600 border-slate-100/50"
+                    "label": s["title"],
+                    "icon": "fa-file-lines" if is_page else "fa-database",
+                    "badge": "bg-violet-50 text-violet-600 border-violet-100/50" if is_page else "bg-slate-50 text-slate-600 border-slate-100/50",
+                    "group": "pages" if is_page else "core",
+                    "viewType": "singleton" if is_page else "table",
                 }
+                if is_page:
+                    # Derive singletonId from schema name: e.g. "homePage" -> "home-page"
+                    import re
+                    slug = re.sub(r'([A-Z])', r'-\1', name).lower().lstrip('-')
+                    meta[name]["singletonId"] = slug
         return meta
+
+    def get_sidebar_config(self):
+        """
+        Returns the complete sidebar hierarchy for the admin frontend.
+        Groups collections into Core Data / Pages / Settings with viewType metadata.
+        """
+        meta = self.get_collection_meta()
+        
+        sidebar = []
+        for group_def in SIDEBAR_GROUPS:
+            group_key = group_def["key"]
+            items = []
+            for col_name, col_meta in meta.items():
+                if col_meta.get("group") == group_key:
+                    item = {
+                        "key": col_name,
+                        "label": col_meta["label"],
+                        "icon": col_meta["icon"],
+                        "badge": col_meta["badge"],
+                        "viewType": col_meta.get("viewType", "table"),
+                    }
+                    if col_meta.get("singletonId"):
+                        item["singletonId"] = col_meta["singletonId"]
+                    items.append(item)
+            
+            sidebar.append({
+                "key": group_key,
+                "label": group_def["label"],
+                "icon": group_def["icon"],
+                "items": items,
+            })
+        
+        return sidebar
 
     def get_image_collections(self):
         img_cols = []
@@ -617,3 +632,4 @@ class SchemaLoader:
         return img_cols
 
 schema_loader = SchemaLoader()
+

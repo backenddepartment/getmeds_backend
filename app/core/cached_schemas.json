@@ -1,64 +1,5 @@
 [
   {
-    "name": "categoryBanner",
-    "title": "Category Banner",
-    "fields": [
-      {
-        "name": "title",
-        "label": "Title",
-        "type": "string",
-        "required": true
-      },
-      {
-        "name": "subtitle",
-        "label": "Subtitle",
-        "type": "string",
-        "required": false,
-        "initialValue": "SHOP BY"
-      },
-      {
-        "name": "image",
-        "label": "Image",
-        "type": "image",
-        "required": false
-      },
-      {
-        "name": "buttonText",
-        "label": "Button Text",
-        "type": "string",
-        "required": false,
-        "initialValue": "SHOP NOW"
-      },
-      {
-        "name": "buttonLink",
-        "label": "Button Link",
-        "type": "string",
-        "required": false,
-        "initialValue": "/product-range"
-      },
-      {
-        "name": "colorScheme",
-        "label": "Color Scheme",
-        "type": "select",
-        "required": false,
-        "options": [
-          {
-            "value": "blue",
-            "label": "Blue"
-          },
-          {
-            "value": "white",
-            "label": "White/Light"
-          },
-          {
-            "value": "green",
-            "label": "Green"
-          }
-        ]
-      }
-    ]
-  },
-  {
     "name": "category",
     "title": "Category",
     "fields": [
@@ -207,40 +148,6 @@
     ]
   },
   {
-    "name": "dealOfDay",
-    "title": "Deal of the Day",
-    "fields": [
-      {
-        "name": "product",
-        "label": "Product",
-        "type": "reference",
-        "required": true,
-        "to": "product"
-      },
-      {
-        "name": "subtitle",
-        "label": "Subtitle",
-        "type": "string",
-        "required": false,
-        "description": "Special subtitle for the deal (e.g., \"Hydrochloride\")"
-      },
-      {
-        "name": "backgroundText",
-        "label": "Background Text",
-        "type": "string",
-        "required": false,
-        "description": "Giant uppercase text in the background (e.g., \"PALONOSETRON\")"
-      },
-      {
-        "name": "priceOverride",
-        "label": "Price Override",
-        "type": "number",
-        "required": false,
-        "description": "Optional override for the display price"
-      }
-    ]
-  },
-  {
     "name": "faq",
     "title": "FAQ & Help Articles",
     "fields": [
@@ -281,94 +188,6 @@
             "label": "Url",
             "type": "string",
             "required": false
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "name": "heroSlide",
-    "title": "Hero Slide",
-    "fields": [
-      {
-        "name": "title",
-        "label": "Page",
-        "type": "string",
-        "required": true
-      },
-      {
-        "name": "headerText",
-        "label": "Header Text",
-        "type": "string",
-        "required": true
-      },
-      {
-        "name": "subHeaderText",
-        "label": "Sub Header Text",
-        "type": "text",
-        "required": true
-      },
-      {
-        "name": "isSlider",
-        "label": "Use Image Slider?",
-        "type": "boolean",
-        "required": false,
-        "description": "Turn this on to use multiple slides. Turn it off to use one background image.",
-        "initialValue": true
-      },
-      {
-        "name": "backgroundImage",
-        "label": "Background Image",
-        "type": "image",
-        "required": true,
-        "hidden_condition": {
-          "field": "isSlider",
-          "operator": "eq",
-          "value": true
-        }
-      },
-      {
-        "name": "backgroundImageAltText",
-        "label": "Background Image Alt Text",
-        "type": "string",
-        "required": true,
-        "hidden_condition": {
-          "field": "isSlider",
-          "operator": "eq",
-          "value": true
-        }
-      },
-      {
-        "name": "slides",
-        "label": "Slides",
-        "type": "array",
-        "required": true,
-        "description": "Optional. Example: Image 1, Main Banner, Promo Slide.",
-        "hidden_condition": {
-          "field": "isSlider",
-          "operator": "eq",
-          "value": false
-        },
-        "of_type": "object",
-        "fields": [
-          {
-            "name": "label",
-            "label": "Slide Label",
-            "type": "string",
-            "required": false,
-            "description": "Optional. Example: Image 1, Main Banner, Promo Slide."
-          },
-          {
-            "name": "image",
-            "label": "Background Image",
-            "type": "image",
-            "required": true
-          },
-          {
-            "name": "altText",
-            "label": "Alt Text",
-            "type": "string",
-            "required": true
           }
         ]
       }
@@ -481,64 +300,2847 @@
     ]
   },
   {
-    "name": "service",
-    "title": "Service",
+    "name": "aboutPage",
+    "title": "About Us Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "About Us Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "introImages",
+        "label": "Introimages",
+        "type": "array",
+        "required": false,
+        "of_type": "imageWithAlt"
+      },
+      {
+        "name": "about",
+        "label": "About",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "paragraphs",
+            "label": "Paragraphs",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "dedicatedToLabel",
+            "label": "Dedicatedtolabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "dedicatedItems",
+            "label": "Dedicateditems",
+            "type": "array",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "highlights",
+        "label": "Highlights",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "certifications",
+            "label": "Certifications",
+            "type": "array",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "mission",
+        "label": "Mission",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "text",
+            "label": "Text",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "vision",
+        "label": "Vision",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "text",
+            "label": "Text",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "coreValues",
+        "label": "Corevalues",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "values",
+            "label": "Values",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "label",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "centerLogoSrc",
+            "label": "Centerlogosrc",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "handImage",
+            "label": "Handimage",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "handImageAlt",
+            "label": "Handimagealt",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "whyChooseUs",
+        "label": "Whychooseus",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "items",
+            "label": "Items",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "team",
+        "label": "Team",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "members",
+            "label": "Members",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "label": "Name",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "role",
+                "label": "Role",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "image",
+                "label": "Image",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "ribbonLabel",
+                "label": "Ribbonlabel",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "partners",
+        "label": "Partners",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "partners",
+            "label": "Partners",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "label": "Name",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "logo",
+                "label": "Logo",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "cta",
+        "label": "Cta",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "primaryAction",
+            "label": "Primaryaction",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "primaryHref",
+            "label": "Primaryhref",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "secondaryAction",
+            "label": "Secondaryaction",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "secondaryHref",
+            "label": "Secondaryhref",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "careersPage",
+    "title": "Careers Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Careers Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "benefits",
+        "label": "Benefits",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "descriptionParagraphs",
+            "label": "Descriptionparagraphs",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "pillars",
+            "label": "Pillars",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "text",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "founderQuote",
+        "label": "Founderquote",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "quote",
+            "label": "Quote",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "author",
+            "label": "Author",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "authorTitle",
+            "label": "Authortitle",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "authorImage",
+            "label": "Authorimage",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "authorImageAlt",
+            "label": "Authorimagealt",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "ctaBanner",
+        "label": "Ctabanner",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "actionLabel",
+            "label": "Actionlabel",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "careerAdvantages",
+        "label": "Careeradvantages",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "items",
+            "label": "Items",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "jobListings",
+        "label": "Joblistings",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionHeading",
+            "label": "Sectionheading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "sectionDescription",
+            "label": "Sectiondescription",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "jobs",
+            "label": "Jobs",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "type",
+                "label": "Type",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "text",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "applicationForm",
+        "label": "Applicationform",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "fields",
+            "label": "Fields",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "label": "Name",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "type",
+                "label": "Type",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "placeholder",
+                "label": "Placeholder",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "submitLabel",
+            "label": "Submitlabel",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "contactPage",
+    "title": "Contact Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Contact Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "info",
+        "label": "Info",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "tagline",
+            "label": "Tagline",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "items",
+            "label": "Items",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "label",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "values",
+                "label": "Values",
+                "type": "array",
+                "required": false
+              },
+              {
+                "name": "socials",
+                "label": "Socials",
+                "type": "array",
+                "required": false,
+                "of_type": "object",
+                "fields": [
+                  {
+                    "name": "platform",
+                    "label": "Platform",
+                    "type": "string",
+                    "required": false
+                  },
+                  {
+                    "name": "icon",
+                    "label": "Icon",
+                    "type": "string",
+                    "required": false
+                  },
+                  {
+                    "name": "href",
+                    "label": "Href",
+                    "type": "string",
+                    "required": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "form",
+        "label": "Form",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "fields",
+            "label": "Fields",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "name",
+                "label": "Name",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "label",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "type",
+                "label": "Type",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "placeholder",
+                "label": "Placeholder",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "required",
+                "label": "Required",
+                "type": "boolean",
+                "required": false
+              },
+              {
+                "name": "options",
+                "label": "Options",
+                "type": "array",
+                "required": false,
+                "of_type": "object",
+                "fields": [
+                  {
+                    "name": "value",
+                    "label": "Value",
+                    "type": "string",
+                    "required": false
+                  },
+                  {
+                    "name": "label",
+                    "label": "Label",
+                    "type": "string",
+                    "required": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "submitLabel",
+            "label": "Submitlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "privacyNotice",
+            "label": "Privacynotice",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "csrPage",
+    "title": "CSR Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "CSR Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "programs",
+        "label": "Programs",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "id",
+            "label": "Id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "flyerImage",
+            "label": "Flyerimage",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "descriptionParagraphs",
+            "label": "Descriptionparagraphs",
+            "type": "array",
+            "required": false
+          },
+          {
+            "name": "programImage",
+            "label": "Programimage",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "patientJourneys",
+        "label": "Patientjourneys",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "video",
+            "label": "Video",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "links",
+            "label": "Links",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "platform",
+                "label": "Platform",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "href",
+                "label": "Href",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "label",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "globalPresencePage",
+    "title": "Global Presence Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Global Presence Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "countries",
+        "label": "Countries",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "name",
+            "label": "Name",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "flag",
+            "label": "Flag",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "role",
+            "label": "Role",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "region",
+            "label": "Region",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "office",
+            "label": "Office",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "label": "Phone",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "website",
+            "label": "Website",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "globalBanner",
+        "label": "Globalbanner",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine2",
+            "label": "Headingline2",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "globeImage",
+            "label": "Globeimage",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "actionLabel",
+            "label": "Actionlabel",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "timeline",
+        "label": "Timeline",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionHeading",
+            "label": "Sectionheading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "events",
+            "label": "Events",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "year",
+                "label": "Year",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "text",
+                "required": false
+              },
+              {
+                "name": "milestones",
+                "label": "Milestones",
+                "type": "array",
+                "required": false,
+                "of_type": "object",
+                "fields": [
+                  {
+                    "name": "title",
+                    "label": "Label",
+                    "type": "string",
+                    "required": false
+                  },
+                  {
+                    "name": "description",
+                    "label": "Description",
+                    "type": "text",
+                    "required": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "globalFootprint",
+        "label": "Globalfootprint",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "homePage",
+    "title": "Home Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Home Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "topBar",
+        "label": "Topbar",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "label",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "label": "Phone",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "phoneHref",
+            "label": "Phonehref",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "socialLinks",
+            "label": "Sociallinks",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "platform",
+                "label": "Platform",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "href",
+                "label": "Href",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "backgroundImage",
+            "label": "Backgroundimage",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "subheading",
+            "label": "Subheading",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "slides",
+            "label": "Slides",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "image",
+                "label": "Image",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "stats",
+        "label": "Stats",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "value",
+            "label": "Value",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "label",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "features",
+        "label": "Features",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "icon",
+            "label": "Icon",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "title",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "productTabs",
+        "label": "Producttabs",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "id",
+            "label": "Id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "label",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "appSection",
+        "label": "Appsection",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "appStoreLabel",
+            "label": "Appstorelabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "googlePlayLabel",
+            "label": "Googleplaylabel",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "meditationsPage",
+    "title": "Meditations Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Meditations Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "mockupImages",
+            "label": "Mockupimages",
+            "type": "array",
+            "required": false,
+            "of_type": "imageWithAlt"
+          }
+        ]
+      },
+      {
+        "name": "appStores",
+        "label": "Appstores",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "label",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "href",
+            "label": "Href",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "mindfulness",
+        "label": "Mindfulness",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "mockupImage",
+            "label": "Mockupimage",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "mockupCaption",
+            "label": "Mockupcaption",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "benefits",
+        "label": "Benefits",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "mockupImage",
+            "label": "Mockupimage",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "mockupCaption",
+            "label": "Mockupcaption",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "features",
+        "label": "Features",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "moreFeaturesLabel",
+            "label": "Morefeatureslabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "items",
+            "label": "Items",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "download",
+        "label": "Download",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "mockupImage",
+            "label": "Mockupimage",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ambientTracks",
+        "label": "Ambienttracks",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "id",
+            "label": "Id",
+            "type": "number",
+            "required": false
+          },
+          {
+            "name": "title",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "orderMedicinesPage",
+    "title": "Order Medicines Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Order Medicines Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "howItWorks",
+        "label": "Howitworks",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "steps",
+            "label": "Steps",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "number",
+                "label": "Number",
+                "type": "number",
+                "required": false
+              },
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "uploadSection",
+        "label": "Uploadsection",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "subheading",
+            "label": "Subheading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "uploadNewLabel",
+            "label": "Uploadnewlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "uploadNewHint",
+            "label": "Uploadnewhint",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "prescriptionGuidance",
+        "label": "Prescriptionguidance",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "items",
+            "label": "Items",
+            "type": "array",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "papPage",
+    "title": "PAP Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "PAP Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "programTitle",
+            "label": "Programtitle",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "programSubtitle",
+            "label": "Programsubtitle",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "accreditationBadge",
+            "label": "Accreditationbadge",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "intro",
+        "label": "Intro",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "subheading",
+            "label": "Subheading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "paragraphs",
+            "label": "Paragraphs",
+            "type": "array",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "steps",
+        "label": "Steps",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "number",
+            "label": "Number",
+            "type": "number",
+            "required": false
+          },
+          {
+            "name": "title",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "icon",
+            "label": "Icon",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "instruction",
+            "label": "Instruction",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "documents",
+            "label": "Documents",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "label",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "note",
+            "label": "Note",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "agencies",
+        "label": "Agencies",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "tabs",
+            "label": "Tabs",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "id",
+                "label": "Id",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "label",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "dswd",
+            "label": "Dswd",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "heading",
+                "label": "Heading",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "requirements",
+                "label": "Requirements",
+                "type": "array",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "pcso",
+            "label": "Pcso",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "heading",
+                "label": "Heading",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "requirements",
+                "label": "Requirements",
+                "type": "array",
+                "required": false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "productsPage",
+    "title": "Products Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Products Page Settings"
+      },
+      {
+        "name": "searchSuggestions",
+        "label": "Search Suggestions",
+        "type": "array",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "servicesPage",
+    "title": "Services Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "Services Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingAccent",
+            "label": "Headingaccent",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "stats",
+        "label": "Stats",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "value",
+            "label": "Value",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "label",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "sectionLabel",
+        "label": "Sectionlabel",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "sectionHeading",
+        "label": "Sectionheading",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "sectionDescription",
+        "label": "Sectiondescription",
+        "type": "text",
+        "required": false
+      },
+      {
+        "name": "services",
+        "label": "Services",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "id",
+            "label": "Id",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "icon",
+            "label": "Icon",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "title",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "badge",
+            "label": "Badge",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "tags",
+            "label": "Tags",
+            "type": "array",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "whyTrust",
+        "label": "Whytrust",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "sectionLabel",
+            "label": "Sectionlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "items",
+            "label": "Items",
+            "type": "array",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "icon",
+                "label": "Icon",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "title",
+                "label": "Label",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "description",
+                "label": "Description",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "cta",
+        "label": "Cta",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "primaryAction",
+            "label": "Primaryaction",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "primaryHref",
+            "label": "Primaryhref",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "secondaryAction",
+            "label": "Secondaryaction",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "secondaryHref",
+            "label": "Secondaryhref",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ungcPage",
+    "title": "UNGC Page",
+    "fields": [
+      {
+        "name": "title",
+        "label": "Page Title",
+        "type": "string",
+        "required": false,
+        "initialValue": "UNGC Page"
+      },
+      {
+        "name": "meta",
+        "label": "Meta",
+        "type": "metaFields",
+        "required": false
+      },
+      {
+        "name": "hero",
+        "label": "Hero",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "imageAlt",
+            "label": "Imagealt",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "logo",
+            "label": "Logo",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          },
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine1",
+            "label": "Headingline1",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "headingLine2",
+            "label": "Headingline2",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "whatIsUngc",
+        "label": "Whatisungc",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "heading",
+            "label": "Heading",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "label": "Description",
+            "type": "text",
+            "required": false
+          },
+          {
+            "name": "supportLabel",
+            "label": "Supportlabel",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "logo",
+            "label": "Logo",
+            "type": "object",
+            "required": false,
+            "of_type": "object",
+            "fields": [
+              {
+                "name": "src",
+                "label": "Src",
+                "type": "string",
+                "required": false
+              },
+              {
+                "name": "alt",
+                "label": "Alt",
+                "type": "string",
+                "required": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "events",
+        "label": "Events",
+        "type": "array",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "date",
+            "label": "Date",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "title",
+            "label": "Label",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "image",
+            "label": "Image",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "siteSettings",
+    "title": "Site Settings",
     "fields": [
       {
         "name": "title",
         "label": "Title",
         "type": "string",
-        "required": true
-      },
-      {
-        "name": "description",
-        "label": "Description",
-        "type": "text",
-        "required": false
-      },
-      {
-        "name": "icon",
-        "label": "Icon Class",
-        "type": "string",
         "required": false,
-        "description": "FontAwesome class (e.g., \"fa-truck-medical\")"
+        "initialValue": "Global Site Settings"
       },
       {
-        "name": "link",
-        "label": "Link",
-        "type": "string",
+        "name": "logo",
+        "label": "Logo",
+        "type": "imageWithAlt",
+        "required": false
+      },
+      {
+        "name": "socials",
+        "label": "Social Links",
+        "type": "array",
         "required": false,
-        "initialValue": "/services"
-      }
-    ]
-  },
-  {
-    "name": "team",
-    "title": "Team Member",
-    "fields": [
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "platform",
+            "label": "Platform",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "icon",
+            "label": "Icon Class",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "href",
+            "label": "Link URL",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
       {
-        "name": "name",
-        "label": "Name",
+        "name": "contactInfo",
+        "label": "Contact Info",
+        "type": "object",
+        "required": false,
+        "of_type": "object",
+        "fields": [
+          {
+            "name": "address",
+            "label": "Address",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "label": "Phone Number",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "email",
+            "label": "Email Address",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "copyright",
+        "label": "Copyright Text",
         "type": "string",
         "required": false
       },
       {
-        "name": "role",
-        "label": "Role",
-        "type": "string",
-        "required": false
-      },
-      {
-        "name": "image",
-        "label": "Image",
-        "type": "image",
-        "required": false
-      },
-      {
-        "name": "bio",
-        "label": "Bio",
-        "type": "text",
-        "required": false
+        "name": "legalLinks",
+        "label": "Legal Links",
+        "type": "array",
+        "required": false,
+        "of_type": "linkItem"
       }
     ]
   }
