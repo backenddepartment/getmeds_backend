@@ -1,6 +1,7 @@
 # pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import List
 
 class Settings(BaseSettings):
     # Sanity Configuration
@@ -14,18 +15,21 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PORT: int = 8000
     CHAT_HISTORY_LIMIT: int = 30
-    ADMIN_TOKEN: str = "getmeds-admin-secret-key"
-
-    # Security Database Configuration
-    SANITY_SECURITY_PROJECT_ID: str = "s7ocz8zp"
-    SANITY_SECURITY_DATASET: str = "security"
-
-    # Centralized Postgres Database Connection (Supabase)
-    DATABASE_URL: str = "postgresql://postgres.odnqyiilnxvlwfiexfgw:gAwmOpE92ve2qrTu@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+    
+    # CORS Configuration
+    allowed_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://getmeds.app",
+        "*"
+    ]
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields from .env
 
 @lru_cache()
 def get_settings():
     return Settings()
+
+settings = get_settings()

@@ -1,10 +1,15 @@
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -21,20 +26,28 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
-venv/
-.venv/
-ENV/
-
-# Environment Variables
+# Environment variables
 .env
+.env.local
+.env.*.local
 
-# IDEs
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Testing/Debug scripts
-debug_sanity.py
-cleanup_faq.py
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
 
-*.pyc
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

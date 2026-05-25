@@ -147,11 +147,10 @@ class ChatbotService:
                     if len(product_results) > 1 and is_recommendation:
                         answer_text += f"I found these variations for **{clean_search.title()}**:\n"
                         for prod in product_results[:3]:
-                            answer_text += f"\n• **{prod.get('title')}**: ₱{(prod.get('price') or 0):,.2f}"
+                            answer_text += f"\n• **{prod.get('title')}**"
                         answer_text += "\n\nWhich one would you like to order?"
                     else:
-                        price = top_result.get('price') or 0
-                        answer_text += f"I found **{top_title}** for **₱{price:,.2f}**. Would you like to proceed with the order?"
+                        answer_text += f"I found **{top_title}**. Would you like to proceed with the order?"
                 elif top_type == "team":
                     role = top_result.get("role", "Team Member")
                     answer_text += f"**{top_title}** is the **{role}** of GetMEDS."

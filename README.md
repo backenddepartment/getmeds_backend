@@ -1,99 +1,213 @@
-# GetMEDS Chatbot Backend
+# GetMEDS Chatbot API
 
-A clean, scalable FastAPI backend for a website customer support chatbot that uses **Sanity CMS** as the primary content database.
+A hyper-contextual AI sales assistant API built with FastAPI that eliminates hallucinations by strictly locking context on user intents. This is a stripped-down version containing only the chatbot API endpoints.
 
 ## Features
-- **Sanity-Powered**: Answers are retrieved directly from your Sanity Studio data.
-- **Hallucination-Free**: Only returns information found in your database.
-- **Scalable Structure**: Follows DRY principles with separated routes, services, and schemas.
-- **FastAPI**: High performance, auto-generated documentation (`/docs`), and validation.
 
-## Project Structure
-```text
-getmeds_backend/
-├── app/
-│   ├── api/
-│   │   └── routes/
-│   │       └── chatbot.py    # API Endpoints
-│   ├── core/
-│   │   └── config.py         # App Settings (Pydantic)
-│   ├── schemas/
-│   │   └── chatbot.py        # Request/Response validation
-│   ├── services/
-│   │   ├── sanity_service.py # Sanity GROQ communication
-│   │   └── chatbot_service.py # Business Logic
-│   └── main.py               # App Entry point
-├── .env                      # Environment Variables
-├── requirements.txt          # Dependencies
-└── README.md
-```
+- 🤖 **Hyper-Contextual Responses**: Smart intent detection with session-based context management
+- 🔍 **Smart Search**: Searches across products, services, FAQs, and team members
+- 💾 **Session Management**: Tracks conversation history and user information
+- 🎯 **Intent Routing**: Handles confirmations, memory checks, identity verification, and recommendations
+- 📝 **Medical Safety Warnings**: Includes appropriate disclaimers for medical queries
+- 🔌 **Sanity CMS Integration**: Powered by Sanity.io as the content backend
 
-## Setup Instructions
+## Installation
 
-### 1. Prerequisites
+### Prerequisites
 - Python 3.9+
-- A Sanity Project ID and Token (optional for public datasets)
+- pip or uv package manager
 
-### 2. Local Development Setup
-1. **Navigate to the directory**:
-   ```bash
-   cd getmeds_backend
-   ```
-2. **Create a virtual environment**:
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate  # On Windows
-   source venv/bin/activate  # On Unix/macOS
-   ```
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. **Configure Environment**:
-   Update the `.env` file with your Sanity Project ID:
-   ```env
-   SANITY_PROJECT_ID=s7ocz8zp
-   SANITY_DATASET=production
-   ```
+### Setup
 
-### 3. Run the Server
+1. Clone the repository and navigate to the project directory:
 ```bash
-python -m app.main
+cd chatbot-api
 ```
-The API will be available at `http://localhost:8000`.
-Check the docs at `http://localhost:8000/docs`.
 
-## Example Usage
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-### Request
-**POST** `http://localhost:8000/api/chatbot/ask`
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Configure environment variables:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your Sanity credentials:
+```env
+SANITY_PROJECT_ID=your_project_id
+SANITY_DATASET=production
+SANITY_TOKEN=your_sanity_token
+```
+
+## Running the API
+
+### Development
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Production
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+The API will be available at `http://localhost:8000`
+
+## API Endpoints
+
+### POST `/api/chatbot/ask`
+Send a message to the chatbot and receive a contextual response.
+
+**Request:**
 ```json
 {
-  "message": "What services do you offer?"
+  "message": "Do you have pain relief medicine?",
+  "session_id": "user-123"  // Optional
 }
 ```
 
-### Response
+**Response:**
 ```json
 {
-  "answer": "I found 2 relevant items for you:\n- Medicine Delivery (service)\n- Online Consultation (service)\n\nYou can click the links below for more details.",
+  "answer": "I found **Aspirin**. Would you like to proceed with the order?",
   "resources": [
     {
-      "title": "Medicine Delivery",
-      "url": "/services/medicine-delivery",
-      "type": "service"
-    },
-    {
-      "title": "Online Consultation",
-      "url": "/services/online-consultation",
-      "type": "service"
+      "title": "Aspirin",
+      "url": "/products/aspirin",
+      "type": "product"
     }
   ],
   "confidence": 1.0
 }
 ```
 
-## Future Enhancements
-- **Semantic Search**: Integrate Vector databases or OpenAI embeddings for better intent matching.
-- **FAQ Schema**: Add a specific `faq` or `article` schema to Sanity for specialized support content.
-- **Rate Limiting**: Add middleware to protect the API.
+### GET `/api/chatbot/status`
+Health check endpoint for the chatbot service.
+
+**Response:**
+```json
+{
+  "status": "online",
+  "service": "GetMEDS Chatbot API"
+}
+```
+
+### GET `/health`
+General health check for the API.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "GetMEDS Chatbot"
+}
+```
+
+## Architecture
+
+```
+chatbot-api/
+├── app/
+│   ├── api/
+│   │   └── routes/
+│   │       └── chatbot.py          # Chatbot API endpoints
+│   ├── core/
+│   │   └── config.py               # Configuration and settings
+│   ├── schemas/
+│   │   └── chatbot.py              # Pydantic models
+│   └── services/
+│       ├── chatbot_service.py       # Chatbot logic and intent routing
+│       └── sanity_service.py        # Sanity CMS integration
+├── main.py                          # FastAPI application entry point
+├── requirements.txt                 # Python dependencies
+├── .env.example                     # Environment variables template
+└── README.md                        # This file
+```
+
+## Intent Detection
+
+The chatbot automatically detects various user intents:
+
+- **Confirmation**: "yes", "sure", "proceed", "like the", "order it"
+- **Memory Check**: "remember", "recap", "summarize"
+- **Identity Check**: "who am i", "my name", "what is my name"
+- **Alternative Request**: "another", "other", "different variation"
+- **Recommendation**: "suggest", "recommend", "show me", "list"
+
+## Session Management
+
+Each conversation is tracked with a unique `session_id`. The service maintains:
+- User name (if provided)
+- Last discussed subject (for context)
+- Message history (with automatic compression after 30 messages)
+- Session summary for long conversations
+
+## Database Integration
+
+The chatbot uses Sanity CMS as the content backend with support for:
+- **Products**: Medicine and healthcare products
+- **Services**: GetMEDS services and offerings
+- **Team Members**: Staff directory with roles
+- **FAQs**: Frequently asked questions
+
+## Configuration
+
+Edit `app/core/config.py` to customize:
+- Sanity API settings
+- CORS allowed origins
+- Chat history limits
+- Application name and debug mode
+
+## API Documentation
+
+Once the server is running, visit:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+## Error Handling
+
+The API returns appropriate HTTP status codes:
+- `200 OK`: Successful request
+- `400 Bad Request`: Invalid input
+- `500 Internal Server Error`: Server-side error with detailed message
+
+## CORS Configuration
+
+By default, CORS is enabled for:
+- `http://localhost:3000`
+- `http://localhost:8000`
+- `https://getmeds.app`
+- All origins (`*`)
+
+Modify `allowed_origins` in `app/core/config.py` to restrict as needed.
+
+## Performance Considerations
+
+- Async/await for non-blocking I/O
+- Connection pooling for Sanity API
+- Session message compression after 30 messages
+- Automatic cleanup of sessions older than 30 days
+
+## Security Notes
+
+⚠️ **Important**: 
+- Never commit your `.env` file with real Sanity tokens
+- Use environment variables for sensitive configuration in production
+- Implement proper authentication for production deployments
+- Validate all user input before processing
+
+## Support
+
+For issues or questions, please refer to the main GetMEDS documentation or contact the development team.
+
+## License
+
+This project is part of the GetMEDS platform.

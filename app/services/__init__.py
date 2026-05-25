@@ -18,14 +18,12 @@ class SanityService:
         else:
             print("WARNING: No Sanity token found in environment!")
 
-
     _client = None
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0))
         return self._client
-
 
     async def query_sanity(self, groq_query: str, params: dict = None):
         """
@@ -47,7 +45,6 @@ class SanityService:
         
         data = response.json()
         return data.get("result", [])
-
 
     async def mutate_sanity(self, mutations: list):
         """
@@ -143,76 +140,6 @@ class SanityService:
             response.raise_for_status()
         return response.json()
 
-
-    async def upload_asset(self, asset_type: str, file_bytes: bytes, filename: str, content_type: str = None):
-        """
-        Uploads an image or file asset to the Sanity API.
-        asset_type: "images" or "files"
-        """
-        url = f"https://{self.project_id}.api.sanity.io/v{settings.SANITY_API_VERSION}/assets/{asset_type}/{self.dataset}"
-        headers = {**self.headers}
-        if content_type:
-            headers["Content-Type"] = content_type
-        
-        params = {"filename": filename}
-        
-        client = self._get_client()
-        response = await client.post(
-            url,
-            content=file_bytes,
-            headers=headers,
-            params=params
-        )
-        if response.status_code not in (200, 201):
-            print(f"ERROR: Asset upload failed: {response.text}")
-            response.raise_for_status()
-        return response.json()
-
-
-    async def save_chat_message(self, session_id: str, role: str, content: str):
-        """
-        Saves a chat message to Sanity. If session doesn't exist, it creates one.
-        """
-        from datetime import datetime
-        import uuid
-        now = datetime.utcnow().isoformat() + "Z"
-        msg_id = str(uuid.uuid4())
-        
-        # Check if session exists
-        query = f'*[_type == "chatSession" && sessionId == $sid][0]'
-        existing = await self.query_sanity(query, {"$sid": session_id})
-        
-        message_obj = {
-            "_key": msg_id, 
-            "role": role, 
-            "content": content, 
-            "timestamp": now
-        }
-
-        
-        if existing:
-            # Update existing
-            doc_id = existing["_id"]
-            mutations = [{
-                "patch": {
-                    "id": doc_id,
-                    "set": {"lastActivity": now},
-                    "insert": {"after": "messages[-1]", "items": [message_obj]}
-                }
-            }]
-        else:
-            # Create new
-            mutations = [{
-                "create": {
-                    "_type": "chatSession",
-                    "sessionId": session_id,
-                    "lastActivity": now,
-                    "messages": [message_obj]
-                }
-            }]
-            
-        return await self.mutate_sanity(mutations)
-            
     async def save_chat_turn(self, session_id: str, user_text: str, ai_text: str, last_subject: str = None):
         """
         Saves a User+AI interaction pair as a single 'turn' object in Sanity.
@@ -269,13 +196,12 @@ class SanityService:
             old_summary = session.get("summary") or ""
             
             # Simple algorithmic summary (concatenation)
-            # In a real-world scenario, you might send this to an LLM to "summarize"
-            new_bits = [f"User: {m.get('user')} | AI: {m.get('ai')}" for m in old_messages[-10:]] # Keep last 10 for context
+            new_bits = [f"User: {m.get('user')} | AI: {m.get('ai')}" for m in old_messages[-10:]]
             new_summary = f"{old_summary}\n--- Archived Segment ---\n" + "\n".join(new_bits)
             
             patch_data["set"]["sessionSummary"] = new_summary
-            patch_data["set"]["messages"] = [turn_obj] # Reset messages with the current one
-            del patch_data["insert"] # No need to insert if we are resetting the whole array
+            patch_data["set"]["messages"] = [turn_obj]
+            del patch_data["insert"]
 
         mutations.append({
             "patch": {
@@ -285,25 +211,6 @@ class SanityService:
         })
         
         return await self.mutate_sanity(mutations)
-
-
-    async def cleanup_old_sessions(self):
-        """
-        Deletes sessions older than 30 days.
-        """
-        from datetime import datetime, timedelta
-        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat() + "Z"
-        
-        query = f'*[_type == "chatSession" && lastActivity < $date]._id'
-        old_ids = await self.query_sanity(query, {"$date": thirty_days_ago})
-        
-        if not old_ids:
-            return 0
-            
-        mutations = [{"delete": {"id": oid}} for oid in old_ids]
-        await self.mutate_sanity(mutations)
-        return len(old_ids)
-
 
     async def search_content(self, query_text: str):
         """
@@ -349,38 +256,33 @@ class SanityService:
         params = {"$search": f"{query_text}*"}
         results = await self.query_sanity(groq_query, params)
         
-        # Step 2: If no results, try matching words individually (Fuzzy OR)
         if not results:
-            # Clean up the search: remove punctuation and split into words
-            import re
-            search_terms = re.findall(r'\w+', query_text)
-            
-            if len(search_terms) > 1:
-                # Try matching if ANY of the words exist
-                # We use lower() and [0...10] for performance
-                or_terms = " || ".join([f"(coalesce(question, name, title, role, subtitle, badge) match '{t}*')" for t in search_terms])
-                groq_query_or = f"""
-                *[_type in ["faq", "product", "service", "team"] && ({or_terms})] {{
-                  _type,
-                  "title": coalesce(question, name, title),
-                  "description": coalesce(answer, description, bio),
-                  "role": role,
-                  "subtitle": subtitle,
-                  "badge": badge,
-                  "slug": slug.current,
-                  "link": coalesce(
-                    link, 
-                    select(_type == "product" => "/products/" + slug.current),
-                    select(_type == "service" => "/services"),
-                    select(_type == "team" => "/team"),
-                    "/faq"
-                  ),
-                  availability
-                }} | order(_type desc) [0...10]
-                """
-                results = await self.query_sanity(groq_query_or)
+            # Fallback: simpler search without matching
+            fallback_query = """
+            *[
+              _type in ["faq", "product", "service", "team"]
+            ] {
+              _type,
+              "title": coalesce(question, name, title),
+              "description": coalesce(answer, description, bio),
+              "answer": answer,
+              "role": role,
+              "subtitle": subtitle,
+              "badge": badge,
+              "slug": slug.current,
+              "link": coalesce(
+                link, 
+                select(_type == "product" => "/products/" + slug.current),
+                select(_type == "service" => "/services"),
+                select(_type == "team" => "/team"),
+                "/faq"
+              ),
+              relatedLinks,
+              availability
+            }
+            """
+            results = await self.query_sanity(fallback_query)
         
         return results
-
 
 sanity_service = SanityService()

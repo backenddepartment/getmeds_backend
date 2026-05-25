@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  chatbot-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SANITY_PROJECT_ID=${SANITY_PROJECT_ID}
+      - SANITY_DATASET=${SANITY_DATASET:-production}
+      - SANITY_API_VERSION=${SANITY_API_VERSION:-2023-05-03}
+      - SANITY_TOKEN=${SANITY_TOKEN}
+      - DEBUG=${DEBUG:-False}
+      - PORT=8000
+    volumes:
+      - .:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
