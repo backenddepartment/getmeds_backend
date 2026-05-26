@@ -260,7 +260,13 @@ class ChatbotService:
 
         if resp:
             final_subject = detected_subject or last_subject
-            await sanity_service.save_chat_turn(session_id, user_message, resp.answer, last_subject=final_subject)
+            await sanity_service.save_chat_turn(
+                session_id, 
+                user_message, 
+                resp.answer, 
+                resources=resp.resources, 
+                last_subject=final_subject
+            )
         
         return resp
 

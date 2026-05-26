@@ -213,7 +213,7 @@ class SanityService:
             
         return await self.mutate_sanity(mutations)
             
-    async def save_chat_turn(self, session_id: str, user_text: str, ai_text: str, last_subject: str = None):
+    async def save_chat_turn(self, session_id: str, user_text: str, ai_text: str, resources: list = None, last_subject: str = None):
         """
         Saves a User+AI interaction pair as a single 'turn' object in Sanity.
         Also checks if we need to compress history to stay under the limit.
@@ -226,10 +226,24 @@ class SanityService:
         turn_id = str(uuid.uuid4())
         timestamp = datetime.utcnow().isoformat() + "Z"
         
+        sanity_resources = []
+        if resources:
+            for r in resources:
+                r_title = r.title if hasattr(r, 'title') else r.get('title')
+                r_url = r.url if hasattr(r, 'url') else r.get('url')
+                r_type = r.type if hasattr(r, 'type') else r.get('type')
+                sanity_resources.append({
+                    "_key": str(uuid.uuid4()),
+                    "title": r_title,
+                    "url": r_url,
+                    "type": r_type
+                })
+        
         turn_obj = {
             "_key": turn_id,
             "user": user_text,
             "ai": ai_text,
+            "resources": sanity_resources,
             "timestamp": timestamp
         }
         
@@ -329,6 +343,11 @@ class SanityService:
           (_type == "teams" && (
             name match $search || 
             designation match $search
+          )) ||
+          (_type == "news" && (
+            title match $search ||
+            description match $search ||
+            tag match $search
           ))
         ] {
           "_type": select(_type == "teams" => "team", _type),
@@ -337,7 +356,8 @@ class SanityService:
             brandName,
             genericName,
             name,
-            question
+            question,
+            title
           ),
           "description": coalesce(description, answer),
           "answer": answer,
@@ -346,6 +366,10 @@ class SanityService:
           "link": coalesce(
             select(_type == "product" => "/products/" + slug.current),
             select(_type == "teams" => "/team"),
+            select(_type == "news" && title match "*Expands Oncology*" => "/article-detail?id=0"),
+            select(_type == "news" && title match "*Summit*" => "/article-detail?id=1"),
+            select(_type == "news" && title match "*Donates Essential*" => "/article-detail?id=2"),
+            select(_type == "news" => "/articles"),
             "/faq"
           ),
           availability,
@@ -367,6 +391,7 @@ class SanityService:
             _type == "teams" && name match $search => 100,
             _type == "product" && (brandName match $search || name match $search) => 80,
             _type == "faq" && question match $search => 60,
+            _type == "news" && title match $search => 50,
             10
           )
         } | order(score desc) [0...10]
@@ -383,17 +408,26 @@ class SanityService:
             
             if len(search_terms) > 1:
                 # Try matching if ANY of the words exist
-                or_terms = " || ".join([f"(coalesce(question, name, brandName, genericName, designation, answer, description) match '{t}*')" for t in search_terms])
+                or_terms = " || ".join([f"(coalesce(question, name, brandName, genericName, designation, answer, description, title) match '{t}*')" for t in search_terms])
                 groq_query_or = f"""
-                *[_type in ["faq", "product", "teams"] && ({or_terms})] {{
+                *[_type in ["faq", "product", "teams", "news"] && ({or_terms})] {{
                   "_type": select(_type == "teams" => "team", _type),
-                  "title": coalesce(name, question),
+                  "title": coalesce(
+                    select(_type == "product" => brandName + " (" + genericName + ")"),
+                    name, 
+                    question, 
+                    title
+                  ),
                   "description": coalesce(description, answer),
                   "role": designation,
                   "slug": slug.current,
                   "link": coalesce(
                     select(_type == "product" => "/products/" + slug.current),
                     select(_type == "teams" => "/team"),
+                    select(_type == "news" && title match "*Expands Oncology*" => "/article-detail?id=0"),
+                    select(_type == "news" && title match "*Summit*" => "/article-detail?id=1"),
+                    select(_type == "news" && title match "*Donates Essential*" => "/article-detail?id=2"),
+                    select(_type == "news" => "/articles"),
                     "/faq"
                   ),
                   availability
