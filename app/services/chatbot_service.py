@@ -198,13 +198,24 @@ class ChatbotService:
                     answer_text += f"**{prod_title}** is {in_stock}. Would you like to proceed with the order?"
 
                 resource_list = [
-                    ResourceLink(title=f"Inquire {brand}", url=f"product-range.html?search={brand}", type="product"),
-                    ResourceLink(title="Order Medicines", url="order-medicines.html", type="page")
+                    ResourceLink(title=f"Inquire {brand}", url=f"/product-range?search={brand}", type="product"),
+                    ResourceLink(title="Order Medicines", url="/order-medicines", type="page")
                 ]
                 resp = ChatResponse(answer=answer_text, resources=resource_list)
 
             elif results:
-                top_result = team_results[0] if team_results else (product_results[0] if product_results else results[0])
+                category_results = [r for r in results if r.get("_type") == "category"]
+                
+                # Prioritize: category -> product -> team -> other
+                if category_results:
+                    top_result = category_results[0]
+                elif product_results:
+                    top_result = product_results[0]
+                elif team_results:
+                    top_result = team_results[0]
+                else:
+                    top_result = results[0]
+                    
                 top_title = top_result.get("title") or ""
                 top_type = top_result.get("_type")
                 if top_type == "product":
@@ -233,6 +244,13 @@ class ChatbotService:
                         f"• **Indications:** {desc[:180]}...\n\n"
                         f"Would you like to proceed with the order?"
                     )
+                elif top_type == "category":
+                    desc = top_result.get("description") or top_result.get("subtitle") or "Specialty therapeutic range."
+                    answer_text += (
+                        f"I found the **{top_title}** category:\n\n"
+                        f"{desc}\n\n"
+                        f"Would you like to view our full range of **{top_title}** products?"
+                    )
                 elif top_type == "team":
                     role = top_result.get("role", "Team Member")
                     answer_text += f"**{top_title}** is the **{role}** of GetMEDS."
@@ -241,21 +259,29 @@ class ChatbotService:
 
                 resource_list = []
                 # Map resources based on search results
-                sorted_results = team_results + product_results + [r for r in results if r.get("_type") not in ["team", "product"]]
+                sorted_results = category_results + product_results + team_results + [r for r in results if r.get("_type") not in ["team", "product", "category"]]
                 for res in sorted_results[:3]:
                     type_ = res.get("_type")
                     if type_ == "product":
                         brand = res.get("brandName") or res.get("title")
-                        resource_list.append(ResourceLink(title=f"Inquire {brand}", url=f"product-range.html?search={brand}", type="product"))
-                        resource_list.append(ResourceLink(title="Order Medicines", url="order-medicines.html", type="page"))
+                        resource_list.append(ResourceLink(title=f"Inquire {brand}", url=f"/product-range?search={brand}", type="product"))
+                        if not any(r.url == "/order-medicines" for r in resource_list):
+                            resource_list.append(ResourceLink(title="Order Medicines", url="/order-medicines", type="page"))
+                    elif type_ == "category":
+                        title = res.get("title")
+                        link = res.get("link") or f"/product-range?category={res.get('slug')}"
+                        resource_list.append(ResourceLink(title=f"Browse {title}", url=link, type="category"))
                     else:
-                        resource_list.append(ResourceLink(title=res.get("title", "View Detail"), url=res.get("link", "#"), type=type_ or "page"))
+                        link = res.get("link", "#")
+                        if not link.startswith("/") and not link.startswith("http"):
+                            link = "/" + link
+                        resource_list.append(ResourceLink(title=res.get("title", "View Detail"), url=link, type=type_ or "page"))
                         
                 resp = ChatResponse(answer=answer_text, resources=resource_list)
             else:
                 resp = ChatResponse(
                     answer="I'm sorry, I couldn't find exactly that. Can I help you with another search or connect you with our team?",
-                    resources=[ResourceLink(title="Contact Us", url="contact-us.html", type="page")]
+                    resources=[ResourceLink(title="Contact Us", url="/contact-us", type="page")]
                 )
 
         if resp:

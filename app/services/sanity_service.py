@@ -332,8 +332,15 @@ class SanityService:
             brandName match $search || 
             genericName match $search || 
             subCategory match $search || 
+            category->category match $search ||
             description match $search ||
             indications match $search
+          )) ||
+          (_type == "category" && (
+            category match $search ||
+            subtitle match $search ||
+            description match $search ||
+            subcategory match $search
           )) ||
           (_type == "faq" && (
             question match $search || 
@@ -353,18 +360,20 @@ class SanityService:
           "_type": select(_type == "teams" => "team", _type),
           "title": coalesce(
             select(_type == "product" => brandName + " (" + genericName + ")"),
+            select(_type == "category" => category),
             brandName,
             genericName,
             name,
             question,
             title
           ),
-          "description": coalesce(description, answer),
+          "description": coalesce(subtitle, description, answer),
           "answer": answer,
           "role": designation,
           "slug": slug.current,
           "link": coalesce(
             select(_type == "product" => "/products/" + slug.current),
+            select(_type == "category" => "/product-range?category=" + slug.current),
             select(_type == "teams" => "/team"),
             select(_type == "news" && title match "*Expands Oncology*" => "/article-detail?id=0"),
             select(_type == "news" && title match "*Summit*" => "/article-detail?id=1"),
@@ -389,6 +398,7 @@ class SanityService:
           supplier,
           "score": select(
             _type == "teams" && name match $search => 100,
+            _type == "category" && category match $search => 90,
             _type == "product" && (brandName match $search || name match $search) => 80,
             _type == "faq" && question match $search => 60,
             _type == "news" && title match $search => 50,
@@ -408,21 +418,23 @@ class SanityService:
             
             if len(search_terms) > 1:
                 # Try matching if ANY of the words exist
-                or_terms = " || ".join([f"(coalesce(question, name, brandName, genericName, designation, answer, description, title) match '{t}*')" for t in search_terms])
+                or_terms = " || ".join([f"(coalesce(category, question, name, brandName, genericName, designation, answer, description, title) match '{t}*')" for t in search_terms])
                 groq_query_or = f"""
-                *[_type in ["faq", "product", "teams", "news"] && ({or_terms})] {{
+                *[_type in ["faq", "product", "teams", "news", "category"] && ({or_terms})] {{
                   "_type": select(_type == "teams" => "team", _type),
                   "title": coalesce(
                     select(_type == "product" => brandName + " (" + genericName + ")"),
+                    select(_type == "category" => category),
                     name, 
                     question, 
                     title
                   ),
-                  "description": coalesce(description, answer),
+                  "description": coalesce(subtitle, description, answer),
                   "role": designation,
                   "slug": slug.current,
                   "link": coalesce(
                     select(_type == "product" => "/products/" + slug.current),
+                    select(_type == "category" => "/product-range?category=" + slug.current),
                     select(_type == "teams" => "/team"),
                     select(_type == "news" && title match "*Expands Oncology*" => "/article-detail?id=0"),
                     select(_type == "news" && title match "*Summit*" => "/article-detail?id=1"),
