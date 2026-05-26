@@ -214,74 +214,99 @@ class SanityService:
 
     async def search_content(self, query_text: str):
         """
-        Searches across products, services, and team members for a given text.
-        Includes a fallback 'OR' search if the specific query fails.
+        Searches across products, FAQs, and team members for a given text.
+        Optimized by targeting existing schema types/fields and slicing results.
         """
         # Step 1: Try combined match (AND) with wildcard
         groq_query = """
         *[
-          _type in ["faq", "product", "service", "team"] && (
-            (question match $search || name match $search || title match $search) ||
-            (answer match $search || description match $search || bio match $search || role match $search || subtitle match $search || badge match $search) ||
-            (tags match $search)
-          )
+          (_type == "product" && (
+            name match $search || 
+            brandName match $search || 
+            genericName match $search || 
+            subCategory match $search || 
+            description match $search ||
+            indications match $search
+          )) ||
+          (_type == "faq" && (
+            question match $search || 
+            answer match $search || 
+            keywords match $search
+          )) ||
+          (_type == "teams" && (
+            name match $search || 
+            designation match $search
+          ))
         ] {
-          _type,
-          "title": coalesce(question, name, title),
-          "description": coalesce(answer, description, bio),
+          "_type": select(_type == "teams" => "team", _type),
+          "title": coalesce(
+            select(_type == "product" => brandName + " (" + genericName + ")"),
+            brandName,
+            genericName,
+            name,
+            question
+          ),
+          "description": coalesce(description, answer),
           "answer": answer,
-          "role": role,
-          "subtitle": subtitle,
-          "badge": badge,
+          "role": designation,
           "slug": slug.current,
           "link": coalesce(
-            link, 
             select(_type == "product" => "/products/" + slug.current),
-            select(_type == "service" => "/services"),
-            select(_type == "team" => "/team"),
+            select(_type == "teams" => "/team"),
             "/faq"
           ),
-          relatedLinks,
           availability,
+          brandName,
+          genericName,
+          form,
+          strength,
+          packaging,
+          storageCondition,
+          dosageAdministration,
+          directionForReconstitution,
+          mechanismOfAction,
+          indications,
+          accreditations,
+          distributor,
+          importer,
+          supplier,
           "score": select(
-            _type == "team" && (role match $search || name match $search) => 100,
-            _type == "product" && (name match $search || title match $search) => 80,
-            _type == "service" && (title match $search || description match $search) => 60,
-            (coalesce(question, name, title) match $search) => 20,
+            _type == "teams" && name match $search => 100,
+            _type == "product" && (brandName match $search || name match $search) => 80,
+            _type == "faq" && question match $search => 60,
             10
           )
-        } | order(score desc)
+        } | order(score desc) [0...10]
         """
         
         params = {"$search": f"{query_text}*"}
         results = await self.query_sanity(groq_query, params)
         
+        # Step 2: If no results, try matching words individually (Fuzzy OR)
         if not results:
-            # Fallback: simpler search without matching
-            fallback_query = """
-            *[
-              _type in ["faq", "product", "service", "team"]
-            ] {
-              _type,
-              "title": coalesce(question, name, title),
-              "description": coalesce(answer, description, bio),
-              "answer": answer,
-              "role": role,
-              "subtitle": subtitle,
-              "badge": badge,
-              "slug": slug.current,
-              "link": coalesce(
-                link, 
-                select(_type == "product" => "/products/" + slug.current),
-                select(_type == "service" => "/services"),
-                select(_type == "team" => "/team"),
-                "/faq"
-              ),
-              relatedLinks,
-              availability
-            }
-            """
-            results = await self.query_sanity(fallback_query)
+            # Clean up the search: remove punctuation and split into words
+            import re
+            search_terms = re.findall(r'\w+', query_text)
+            
+            if len(search_terms) > 1:
+                # Try matching if ANY of the words exist
+                or_terms = " || ".join([f"(coalesce(question, name, brandName, genericName, designation, answer, description) match '{t}*')" for t in search_terms])
+                groq_query_or = f"""
+                *[_type in ["faq", "product", "teams"] && ({or_terms})] {{
+                  "_type": select(_type == "teams" => "team", _type),
+                  "title": coalesce(name, question),
+                  "description": coalesce(description, answer),
+                  "role": designation,
+                  "slug": slug.current,
+                  "link": coalesce(
+                    select(_type == "product" => "/products/" + slug.current),
+                    select(_type == "teams" => "/team"),
+                    "/faq"
+                  ),
+                  availability
+                }} | order(_type desc) [0...10]
+                """
+                results = await self.query_sanity(groq_query_or)
         
         return results
 
