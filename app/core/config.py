@@ -10,6 +10,13 @@ class Settings(BaseSettings):
     SANITY_API_VERSION: str = "2023-05-03"
     SANITY_TOKEN: str = "skCgFfGBsFDPop8HAzyvtZQ62TnHAwQdFGzZoQAFH8b9Upzcvu8jIBXQ9euuMZpIgG7G5Lhpn5T7q4MNSpCZokjnFod76UFIsQbnyy3PzorlTW9bVth6DmKn0xTVKHVFhgLOoSZ3mTwlZeLXR3yOYc4MrZQlrSs3SkLPe7ULcf1QcKUhq0OS"
 
+    # Anthropic Configuration
+    ANTHROPIC_API_KEY: str = ""
+
+    # Chatbot Routing Configuration
+    PRIMARY: str = "trained_assistant"
+    SECONDARY: str = "anthropic_ai"
+
     # App Configuration
     APP_NAME: str = "GetMEDS Chatbot API"
     DEBUG: bool = False

@@ -160,11 +160,16 @@ The chatbot uses Sanity CMS as the content backend with support for:
 
 ## Configuration
 
-Edit `app/core/config.py` to customize:
+Edit `app/core/config.py` or `.env` to customize:
 - Sanity API settings
 - CORS allowed origins
 - Chat history limits
 - Application name and debug mode
+- **Chatbot Routing**:
+  - `PRIMARY`: The primary chatbot responder (`trained_assistant` or `anthropic_ai`). Defaults to `trained_assistant`.
+  - `SECONDARY`: The secondary/fallback chatbot responder (`anthropic_ai` or `trained_assistant`). Defaults to `anthropic_ai`.
+
+Both responders can be interchanged by swapping `PRIMARY` and `SECONDARY` in `.env`. If a responder is disabled (e.g., `anthropic_ai` when `ANTHROPIC_API_KEY` is not set), it will gracefully skip to the next available responder or last-resort static response.
 
 ## API Documentation
 
