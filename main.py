@@ -1,3 +1,17 @@
+# Force IPv4 socket resolution globally to prevent Windows IPv6 httplib2 connection timeouts
+import socket
+orig_getaddrinfo = socket.getaddrinfo
+def forced_getaddrinfo(*args, **kwargs):
+    args = list(args)
+    if len(args) > 2:
+        args[2] = socket.AF_INET
+    else:
+        while len(args) < 2:
+            args.append(None)
+        args.append(socket.AF_INET)
+    return orig_getaddrinfo(*args, **kwargs)
+socket.getaddrinfo = forced_getaddrinfo
+
 # pyrefly: ignore [missing-import]
 import os
 from fastapi import FastAPI
@@ -7,8 +21,8 @@ from app.api.routes.spreadsheet import router as spreadsheet_router
 from app.core.config import settings
 
 # ── Skill File Loading ──────────────────────────────────────────────────────
-# These files are loaded once at startup and used when Anthropic Claude
-# is called as the primary responder. The trained assistant does not use them.
+# These files are loaded once at startup and shared by all AI responders
+# (Anthropic Claude, Groq, trained assistant) as system prompt context.
 
 def _load_skill(filename: str) -> str:
     """Load a skill .md file from app/skills/. Returns empty string if missing."""
@@ -20,16 +34,16 @@ def _load_skill(filename: str) -> str:
             print(f"INFO: Loaded skill file: {filename} ({len(content)} chars)")
             return content
     except FileNotFoundError:
-        print(f"WARNING: Skill file not found at {path} — Anthropic primary will have no system prompt")
+        print(f"WARNING: Skill file not found at {path} — AI responders will have no system prompt")
         return ""
 
-ANTHROPIC_SKILL = _load_skill("ANTHROPIC_SKILL_CHATBOT.md")
+AI_SKILL = _load_skill("AI_SKILL_CHATBOT.md")
 CUSTOMER_SERVICE_SKILL = _load_skill("CUSTOMER_SERVICE_SKILL_CHATBOT.md")
 
-# Combined system prompt — injected into Claude when it acts as primary
+# Combined system prompt — injected into Claude/Groq when acting as responder
 COMBINED_SYSTEM_PROMPT = (
-    f"{ANTHROPIC_SKILL}\n\n---\n\n{CUSTOMER_SERVICE_SKILL}"
-    if ANTHROPIC_SKILL and CUSTOMER_SERVICE_SKILL
+    f"{AI_SKILL}\n\n---\n\n{CUSTOMER_SERVICE_SKILL}"
+    if AI_SKILL and CUSTOMER_SERVICE_SKILL
     else ""
 )
 

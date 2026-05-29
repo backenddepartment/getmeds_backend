@@ -1,4 +1,4 @@
-# ANTHROPIC_SKILL_CHATBOT.md
+# AI_SKILL_CHATBOT.md
 ## GetMEDS AI Assist — Categorization & Data Routing Skill
 
 > **Purpose:** This document trains the AI on how to categorize every user question and where to find the correct answer — either from the **Sanity database** (products, categories, FAQs, teams) or from **frontend page context** (services, company info, pages, navigation suggestions). The AI must never hallucinate. It must only answer with what it can verify from these two data sources.
@@ -191,7 +191,7 @@ Return: `name` + `designation`. Link to `/about-us` for full team listing.
 ## 10. News / Articles → SOURCE A (Sanity: `news`)
 **Triggers:** "news", "latest", "article", "announcement", "press release", specific article keywords
 
-Link to `/articles` or specific `/article-detail?id=X`.
+Link to `/articles` or specific `/article-detail?id=[Sanity_ID]` where `[Sanity_ID]` is the actual document `_id` returned in the search results.
 
 ---
 
@@ -279,7 +279,7 @@ After every response, attach 1–3 relevant resource links. Rules:
 | Order action | `{ title: "Order Medicines", url: "/order-medicines", type: "page" }` |
 | PAP | `{ title: "Patient Assistance Program", url: "/pap", type: "page" }` |
 | Contact | `{ title: "Contact Us", url: "/contact-us", type: "page" }` |
-| Article | `{ title: "[Article Title]", url: "/article-detail?id=[n]", type: "article" }` |
+| Article | `{ title: "[Article Title]", url: "/article-detail?id=[Sanity_ID]", type: "article" }` |
 
 Maximum 3 resources per response. Do not repeat the same URL twice in one response.
 

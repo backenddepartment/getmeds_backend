@@ -20,7 +20,11 @@ async def ask_chatbot(request_data: dict | str = Body(...)):
         request = ChatRequest(**request_data)
         
         session_id = request.session_id or "anonymous-user"
-        response = await chatbot_service.get_response(request.message, session_id=session_id)
+        response = await chatbot_service.get_response(
+            request.message,
+            session_id=session_id,
+            page_context=request.page_context
+        )
         return response
 
     except Exception as e:

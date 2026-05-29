@@ -375,10 +375,7 @@ class SanityService:
             select(_type == "product" => "/products/" + slug.current),
             select(_type == "category" => "/product-range?category=" + slug.current),
             select(_type == "teams" => "/team"),
-            select(_type == "news" && title match "*Expands Oncology*" => "/article-detail?id=0"),
-            select(_type == "news" && title match "*Summit*" => "/article-detail?id=1"),
-            select(_type == "news" && title match "*Donates Essential*" => "/article-detail?id=2"),
-            select(_type == "news" => "/articles"),
+            select(_type == "news" => "/article-detail?id=" + _id),
             "/faq"
           ),
           availability,
@@ -436,10 +433,7 @@ class SanityService:
                     select(_type == "product" => "/products/" + slug.current),
                     select(_type == "category" => "/product-range?category=" + slug.current),
                     select(_type == "teams" => "/team"),
-                    select(_type == "news" && title match "*Expands Oncology*" => "/article-detail?id=0"),
-                    select(_type == "news" && title match "*Summit*" => "/article-detail?id=1"),
-                    select(_type == "news" && title match "*Donates Essential*" => "/article-detail?id=2"),
-                    select(_type == "news" => "/articles"),
+                    select(_type == "news" => "/article-detail?id=" + _id),
                     "/faq"
                   ),
                   availability

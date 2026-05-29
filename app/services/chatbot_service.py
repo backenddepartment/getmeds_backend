@@ -10,6 +10,30 @@ settings = get_settings()
 # Sentinel value — returned by trained engine when it cannot handle the query
 _FALLBACK_SENTINEL = "__FALLBACK__"
 
+# Unified keyword filter list to ensure search query extraction is clean
+_STOP_WORDS = {
+    # English common pronouns, auxiliary verbs, and function words
+    "do", "does", "did", "doing", "you", "your", "yours", "yourself", "yourselves",
+    "have", "has", "had", "having", "what", "is", "are", "was", "were", "be", "been",
+    "being", "am", "tell", "me", "about", "search", "find", "the", "a", "an", "for",
+    "how", "much", "can", "please", "i", "we", "us", "our", "ours", "want", "to",
+    "order", "with", "any", "some", "of", "could", "would", "should", "get", "give",
+    "show", "from", "it", "this", "that", "who", "they", "them", "their", "theirs",
+    "getmeds", "company", "cost", "total", "price", "worth", "buy", "need",
+    "products", "medicine", "meds", "suggest", "recommend", "another", "other",
+    "else", "like", "remember", "inquiry", "philippines", "phil", "ph", "here", "there",
+    "he", "she", "him", "her", "his", "hers",
+
+    # Tagalog/Taglish particles and common words
+    "ang", "ng", "mga", "sa", "na", "para", "po", "at", "o", "si", "ni", "kay",
+    "ako", "ikaw", "siya", "kami", "tayo", "kayo", "sila", "ito", "iyan", "iyon",
+    "dito", "diyan", "doon", "ano", "sino", "saan", "kailan", "bakit", "paano",
+    "magkano", "may", "mayroon", "wala", "hindi", "huwag", "opo", "oho", "meron",
+    "pabili", "salamat", "tuloy", "ba", "kayong", "inyo", "ninyo", "gamot",
+    "sana", "lang", "din", "rin", "naman", "nga", "mismo", "gusto", "kailangan",
+    "namin", "ko", "mo", "aking", "iyong", "stock", "available", "availability"
+}
+
 
 def product_belongs_to_subcategory(product, subcategory_name):
     prod_sub = product.get("subCategory") or ""
@@ -18,19 +42,18 @@ def product_belongs_to_subcategory(product, subcategory_name):
 
 
 
-# ── Step 3: Anthropic Claude Primary ───────────────────────────────────────
-# Called as the primary responder when the API key is present.
-
+# ── AI Responder: Anthropic Claude ──────────────────────────────────
 async def _call_anthropic(
     system_prompt: str,
     user_message: str,
     session_context: dict,
     search_results: list,
-    lang: str = "en"
+    lang: str = "en",
+    page_context: str = None
 ) -> ChatResponse | None:
     """
     Calls Anthropic Claude as the primary responder.
-    Returns ChatResponse or None if the call fails.
+    Returns ChatResponse, or None if the call fails.
     """
     if not settings.ANTHROPIC_API_KEY:
         print("INFO: ANTHROPIC_API_KEY not set — skipping Claude primary")
@@ -66,7 +89,11 @@ Target Response Language: English
 - Reply in standard professional English.
 """
 
+
+
         # Build the live context block — this tells Claude everything it needs
+        page_context_block = f"\nRaw text from the page the user is currently viewing:\n{page_context}\n" if page_context else ""
+        
         context_block = f"""
 --- LIVE CONTEXT ---
 Session ID: {session_context.get('sessionId', 'unknown')}
@@ -77,11 +104,12 @@ Session Summary: {session_context.get('sessionSummary') or 'No previous history'
 Search Results from Sanity Database (top 5):
 {json.dumps(search_results[:5], indent=2, default=str) if search_results else '[]'}
 
+{page_context_block}
+
 Note: You are GetMEDS AI Assist, the primary responder. Stay within GetMEDS context only.
 Use only the data provided above — do not invent product information.
 
 {lang_instruction}
-
 Current User Message: {user_message}
 ---
 
@@ -95,7 +123,6 @@ Required format:
 }}
 Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /order-medicines, /contact-us, /pap, /about-us, /services, /global-presence, /careers, /articles, /csr, /ungc, /meditations).
 """
-
         response = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
@@ -114,6 +141,8 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
         raw = raw.strip()
 
         parsed = json.loads(raw)
+
+
 
         resources = [
             ResourceLink(
@@ -137,7 +166,10 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
         print(f"WARNING: Claude returned invalid JSON: {e} — raw: {raw[:200]}")
         return None
     except Exception as e:
-        print(f"WARNING: Anthropic API call failed: {type(e).__name__}: {e}")
+        status_code_str = ""
+        if hasattr(e, "status_code"):
+            status_code_str = f" (Status Code: {getattr(e, 'status_code')})"
+        print(f"WARNING: Anthropic API call failed{status_code_str}: {type(e).__name__}: {e}")
         return None
 
 
@@ -146,7 +178,8 @@ async def _call_groq(
     user_message: str,
     session_context: dict,
     search_results: list,
-    lang: str = "en"
+    lang: str = "en",
+    page_context: str = None
 ) -> ChatResponse | None:
     """
     Calls Groq Cloud API as a responder.
@@ -187,6 +220,10 @@ Target Response Language: English
 - Reply in standard professional English.
 """
 
+
+
+    page_context_block = f"\nRaw text from the page the user is currently viewing:\n{page_context}\n" if page_context else ""
+
     context_block = f"""
 --- LIVE CONTEXT ---
 Session ID: {session_context.get('sessionId', 'unknown')}
@@ -197,11 +234,12 @@ Session Summary: {session_context.get('sessionSummary') or 'No previous history'
 Search Results from Sanity Database (top 5):
 {json.dumps(search_results[:5], indent=2, default=str) if search_results else '[]'}
 
+{page_context_block}
+
 Note: You are GetMEDS AI Assist. Stay within GetMEDS context only.
 Use only the data provided above — do not invent product information.
 
 {lang_instruction}
-
 Current User Message: {user_message}
 ---
 
@@ -215,8 +253,21 @@ Required format:
 }}
 Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /order-medicines, /contact-us, /pap, /about-us, /services, /global-presence, /careers, /articles, /csr, /ungc, /meditations).
 """
+    # Models ordered by capability — larger context models first to handle full system prompt.
+    # llama3-8b-8192 has been decommissioned by Groq and is removed.
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
 
-    models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+    # Condensed system prompt for small models that can't handle the full prompt (TPM < 8K)
+    condensed_system_prompt = """You are GetMEDS AI Assist, a helpful customer service assistant for GetMEDS, a specialty pharmaceutical importer and distributor in the Philippines.
+Rules:
+- Only answer about GetMEDS products, services, ordering, and company information.
+- Never invent product data. Use only what is provided in the search results.
+- Never give specific prices — redirect to inquiry form.
+- Always include a medical disclaimer if clinical questions arise.
+- Be warm, empathetic, professional, and concise.
+- Respond in the user's language (English, Tagalog, or Taglish).
+- Maximum 3 resource links per response. Valid pages: /product-range, /order-medicines, /contact-us, /pap, /about-us, /services, /global-presence, /careers, /articles, /csr, /ungc, /meditations."""
+
     url = "https://api.groq.com/openai/v1/chat/completions"
 
     for api_key in keys:
@@ -226,10 +277,13 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
         }
         for model in models:
             try:
+                # Use condensed prompt for smaller models to stay under TPM limits
+                effective_prompt = system_prompt if "70b" in model or "mixtral" in model else condensed_system_prompt
+
                 payload = {
                     "model": model,
                     "messages": [
-                        {"role": "system", "content": system_prompt},
+                        {"role": "system", "content": effective_prompt},
                         {"role": "user", "content": context_block}
                     ],
                     "temperature": 0.2,
@@ -247,6 +301,9 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
                         raw = raw.strip()
 
                         parsed = json.loads(raw)
+                        
+
+
                         resources = [
                             ResourceLink(
                                 title=r.get("title", ""),
@@ -260,11 +317,19 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
                         if answer:
                             print(f"INFO: Groq responder succeeded with model '{model}' for message: {user_message[:60]}...")
                             return ChatResponse(answer=answer, resources=resources, confidence=1.0)
+                    elif response.status_code == 413:
+                        # Request too large for this model — skip to next (larger) model, same key
+                        print(f"WARNING: Groq model {model} can't handle prompt size (413). Reason: {response.text}. Trying next model...")
+                        continue
+                    elif response.status_code == 400:
+                        # Model decommissioned or invalid — skip to next model
+                        print(f"WARNING: Groq model {model} returned 400 (possibly decommissioned). Reason: {response.text}. Trying next model...")
+                        continue
                     elif response.status_code in [401, 403, 429]:
-                        print(f"WARNING: Groq key {api_key[:12]}... failed with status {response.status_code}. Trying next key...")
+                        print(f"WARNING: Groq key {api_key[:12]}... failed with status {response.status_code}. Reason: {response.text}. Trying next key...")
                         break # Break models loop to try next key
                     else:
-                        print(f"WARNING: Groq call failed with status {response.status_code} for model {model}: {response.text}")
+                        print(f"WARNING: Groq call failed with status {response.status_code} for model {model}. Reason: {response.text}")
             except Exception as e:
                 print(f"WARNING: Groq call with model {model} failed using key {api_key[:12]}...: {type(e).__name__}: {e}")
 
@@ -312,14 +377,14 @@ class ChatbotService:
             self._categories_cache = await sanity_service.query_sanity(query)
         return self._categories_cache
 
-    async def get_response(self, user_message: str, session_id: str = "default") -> ChatResponse:
+    async def get_response(self, user_message: str, session_id: str = "default", page_context: str = None) -> ChatResponse:
         """
         5-step orchestrator:
           1. Pre-process (session load, name detection, keyword extraction)
           2. Sanity database search
-          3. Anthropic Claude (PRIMARY — runs first if key is present)
-          4. Trained rule-based engine (FALLBACK — runs if Claude fails/disabled)
-          5. Static last-resort response
+          3. Generate Plan & Tasks (Stage 1) - stored in Sanity
+          4. Generate Walkthrough (Stage 2) - using primary/fallback responders
+          5. Combine Plan, Tasks, and Walkthrough + Cleanup temporary state in Sanity
         """
         lang = self._detect_language(user_message)
 
@@ -330,6 +395,10 @@ class ChatbotService:
         current_user_name = session_data.get("userName") if session_data else None
         last_subject = session_data.get("lastSubject") if session_data else None
         session_summary = session_data.get("sessionSummary", "") if session_data else ""
+
+        # Fetch temporary plan and tasks if already present (e.g. from prior cutoff)
+        temp_plan = session_data.get("tempPlan") if session_data else None
+        temp_tasks = session_data.get("tempTasks") if session_data else None
 
         last_ai_msg = ""
         if session_data and session_data.get("messages"):
@@ -371,24 +440,7 @@ class ChatbotService:
         effective_name = new_user_name or current_user_name
 
         # Keyword extraction
-        stop_words = {
-            "do", "you", "have", "what", "is", "are", "tell", "me", "about",
-            "search", "find", "the", "a", "an", "for", "how", "much", "can",
-            "please", "i", "want", "to", "order", "with", "any", "some", "of",
-            "could", "would", "should", "get", "give", "show", "from", "it", "this",
-            "that", "who", "getmeds", "company", "cost", "total", "price", "worth",
-            "buy", "need", "products", "medicine", "meds", "suggest", "recommend",
-            "another", "other", "else", "like", "remember", "inquiry",
-            "philippines", "phil", "ph",
-            "ang", "ng", "mga", "sa", "na", "para", "po", "at", "o", "si", "ni", "kay",
-            "ako", "ikaw", "siya", "kami", "tayo", "kayo", "sila", "ito", "iyan", "iyon",
-            "dito", "diyan", "doon", "ano", "sino", "saan", "kailan", "bakit", "paano",
-            "magkano", "may", "mayroon", "wala", "hindi", "huwag", "opo", "oho", "meron",
-            "pabili", "salamat", "tuloy", "ba", "kayong", "inyo", "ninyo", "gamot",
-            "sana", "lang", "din", "rin", "naman", "nga", "mismo", "gusto", "kailangan",
-            "namin", "ko", "mo", "aking", "iyong", "stock", "available", "availability"
-        }
-        keywords = [w for w in query_clean.split() if w not in stop_words]
+        keywords = [w for w in query_clean.split() if w not in _STOP_WORDS]
 
         # Pronoun context lock
         query_words = set(query_clean.split())
@@ -531,7 +583,6 @@ class ChatbotService:
         elif clean_search.strip():
             search_results = await sanity_service.search_content(clean_search)
 
-        resp = None
         primary_responder = settings.PRIMARY.lower().strip() if settings.PRIMARY else "anthropic_ai"
         secondary_responder = settings.SECONDARY.lower().strip() if settings.SECONDARY else "trained_assistant"
         tertiary_responder = settings.TERTIARY.lower().strip() if settings.TERTIARY else "groq_ai"
@@ -560,7 +611,8 @@ class ChatbotService:
                     user_message=user_message,
                     session_context=session_context,
                     search_results=search_results,
-                    lang=lang
+                    lang=lang,
+                    page_context=page_context
                 )
             elif name == "groq_ai":
                 try:
@@ -580,7 +632,8 @@ class ChatbotService:
                     user_message=user_message,
                     session_context=session_context,
                     search_results=search_results,
-                    lang=lang
+                    lang=lang,
+                    page_context=page_context
                 )
             elif name == "trained_assistant":
                 print(f"INFO: Trying trained assistant responder: {user_message[:60]}...")
@@ -601,31 +654,29 @@ class ChatbotService:
                 print(f"WARNING: Unknown responder name: '{name}'")
                 return None
 
-        # ── Call Primary Responder ───────────────────────────────────────────
+        # ── Step 3: Generate Response ──────────────────────────────────────────
+        resp = None
+        
         if primary_responder:
             resp = await try_responder(primary_responder)
             responders_tried.append(primary_responder)
 
-        # ── Call Secondary Responder (Fallback) ──────────────────────────────
         if resp is None or resp.answer == _FALLBACK_SENTINEL:
             if secondary_responder and secondary_responder not in responders_tried:
-                print(f"WARNING: Primary responder '{primary_responder}' failed or returned fallback. Falling back to secondary '{secondary_responder}'...")
+                print(f"WARNING: Primary responder '{primary_responder}' failed. Trying secondary '{secondary_responder}'...")
                 resp = await try_responder(secondary_responder)
                 responders_tried.append(secondary_responder)
 
-        # ── Call Tertiary Responder (Fallback) ───────────────────────────────
         if resp is None or resp.answer == _FALLBACK_SENTINEL:
             if tertiary_responder and tertiary_responder not in responders_tried:
-                print(f"WARNING: Secondary responder '{secondary_responder}' failed or returned fallback. Falling back to tertiary '{tertiary_responder}'...")
+                print(f"WARNING: Secondary responder '{secondary_responder}' failed. Trying tertiary '{tertiary_responder}'...")
                 resp = await try_responder(tertiary_responder)
                 responders_tried.append(tertiary_responder)
 
-        # ── Step 5: Static Last-Resort ────────────────────────────────────────
-        # Triggered if the fallback rule-based assistant also couldn't handle it
+        # ── Step 4: Static Last-Resort Fallback ──────────────────────────────
         if resp is None or resp.answer == _FALLBACK_SENTINEL:
-            print(f"INFO: Fallback failed or returned sentinel — serving static last-resort")
+            print("INFO: All responders failed — serving static last-resort")
             
-            # Detect if the query is outside the GetMEDS domain (no medical/order/support keywords)
             in_scope_keywords = {
                 "medicine", "medicines", "product", "products", "drug", "drugs", "brand", "generic", "strength", "form",
                 "availability", "stock", "inquire", "inquiry", "order", "buy", "purchase", "prescribe", "prescription",
@@ -664,7 +715,7 @@ class ChatbotService:
                 confidence=0.5
             )
 
-        # ── Save Turn to Sanity ──────────────────────────────────────────────
+        # ── Step 5: Save turn permanently to chat logs ──────────────────────
         detected_subject = None
         for r in resp.resources:
             if r.type == "product" and "Inquire" in r.title:
@@ -681,8 +732,6 @@ class ChatbotService:
         )
 
         return resp
-
-
     async def _rule_based_response(
         self,
         query: str,
@@ -705,25 +754,8 @@ class ChatbotService:
         which signals the orchestrator to try static fallback instead.
         """
         # Relevance check to prevent weak matches (e.g. single generic word matches like "philippines")
-        stop_words = {
-            "do", "you", "have", "what", "is", "are", "tell", "me", "about",
-            "search", "find", "the", "a", "an", "for", "how", "much", "can",
-            "please", "i", "want", "to", "order", "with", "any", "some", "of",
-            "could", "would", "should", "get", "give", "show", "from", "it", "this",
-            "that", "who", "getmeds", "company", "cost", "total", "price", "worth",
-            "buy", "need", "products", "medicine", "meds", "suggest", "recommend",
-            "another", "other", "else", "like", "remember", "inquiry",
-            "philippines", "phil", "ph",
-            "ang", "ng", "mga", "sa", "na", "para", "po", "at", "o", "si", "ni", "kay",
-            "ako", "ikaw", "siya", "kami", "tayo", "kayo", "sila", "ito", "iyan", "iyon",
-            "dito", "diyan", "doon", "ano", "sino", "saan", "kailan", "bakit", "paano",
-            "magkano", "may", "mayroon", "wala", "hindi", "huwag", "opo", "oho", "meron",
-            "pabili", "salamat", "tuloy", "ba", "kayong", "inyo", "ninyo", "gamot",
-            "sana", "lang", "din", "rin", "naman", "nga", "mismo", "gusto", "kailangan",
-            "namin", "ko", "mo", "aking", "iyong", "stock", "available", "availability"
-        }
         query_words = set(query_clean.split())
-        query_keywords = {w for w in query_words if w not in stop_words}
+        query_keywords = {w for w in query_words if w not in _STOP_WORDS}
         
         def is_result_relevant(res):
             res_type = res.get("_type")
@@ -1045,7 +1077,7 @@ class ChatbotService:
         is_usage = any(w in query for w in ["how to use", "dosage", "administration", "how to take", "directions", "reconstitute", "administer", "use it", "paano inumin", "paano gamitin", "inumin", "gamitin"])
         is_purpose = any(w in query for w in ["what is it for", "purpose", "indications", "what does it do", "mechanism", "treat", "cure", "para saan", "gamot sa", "indikas"])
         is_supplier = any(w in query for w in ["supplier", "importer", "distributor", "origin", "where from", "who makes", "manufacturer", "accreditation", "galing sa", "saan galing"])
-        is_availability = any(w in query for w in ["do you have", "in stock", "available", "availability", "meron ba", "mayroon ba", "may stock"])
+        is_availability = any(w in query for w in ["do you have", "do we have", "we have", "in stock", "available", "availability", "meron ba", "mayroon ba", "may stock"])
 
         # ── Specific product intent ───────────────────────────────────────────
         if active_product and (is_price or is_usage or is_purpose or is_supplier or is_availability):
