@@ -5,3 +5,5 @@ pydantic-settings
 httpx
 python-dotenv
 anthropic>=0.25.0
+google-auth
+google-api-python-client

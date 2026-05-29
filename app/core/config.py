@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     SANITY_API_VERSION: str = "2023-05-03"
     SANITY_TOKEN: str = "skCgFfGBsFDPop8HAzyvtZQ62TnHAwQdFGzZoQAFH8b9Upzcvu8jIBXQ9euuMZpIgG7G5Lhpn5T7q4MNSpCZokjnFod76UFIsQbnyy3PzorlTW9bVth6DmKn0xTVKHVFhgLOoSZ3mTwlZeLXR3yOYc4MrZQlrSs3SkLPe7ULcf1QcKUhq0OS"
 
+    # Google Sheets Configuration
+    GOOGLE_CLIENT_EMAIL: str = ""
+    GOOGLE_PRIVATE_KEY: str = ""
+
     # Anthropic Configuration
     ANTHROPIC_API_KEY: str = ""
 
