@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Anthropic Configuration
     ANTHROPIC_API_KEY: str = ""
 
+    # Groq Configuration — fallback/trained-assistant AI responder
+    GROQ_API_KEY: str = ""
+
     # Chatbot Routing Configuration
     PRIMARY: str = "trained_assistant"
     SECONDARY: str = "anthropic_ai"

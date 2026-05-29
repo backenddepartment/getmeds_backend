@@ -141,6 +141,125 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
         return None
 
 
+async def _call_groq(
+    system_prompt: str,
+    user_message: str,
+    session_context: dict,
+    search_results: list,
+    lang: str = "en"
+) -> ChatResponse | None:
+    """
+    Calls Groq Cloud API as a responder.
+    Tries llama-3.1-8b-instant first, and falls back to other models if needed.
+    """
+    import httpx
+    if not settings.GROQ_API_KEY:
+        print("INFO: GROQ_API_KEY not set — skipping Groq responder")
+        return None
+
+    # Define target language style instruction
+    lang_instruction = ""
+    if lang == "tl":
+        lang_instruction = """
+Target Response Language: Tagalog (Filipino)
+- Please reply in clear, polite, and helpful Tagalog.
+- Use polite particles such as 'po' and 'opo' where appropriate to keep a professional and respectful customer service tone.
+- Keep branding names (like GetMEDS, PacliGet, Irose) in their original English forms.
+"""
+    elif lang == "tg":
+        lang_instruction = """
+Target Response Language: Taglish (Tagalog-English code-switching)
+- Please reply in natural, polite, and helpful Taglish (a mix of Tagalog and English).
+- Use Tagalog grammatical sentence structures and connectors, but feel free to use English words/phrases for key technical terms, action names (e.g. order, prescription, stock, upload, inquiry), or page paths.
+- Use polite particles such as 'po' and 'opo' to maintain a professional, friendly, and respectful customer service tone.
+- Make it sound natural and conversational, just like a customer service agent chatting with a Filipino user.
+"""
+    else:
+        lang_instruction = """
+Target Response Language: English
+- Reply in standard professional English.
+"""
+
+    context_block = f"""
+--- LIVE CONTEXT ---
+Session ID: {session_context.get('sessionId', 'unknown')}
+User Name: {session_context.get('userName') or 'Unknown'}
+Last Subject: {session_context.get('lastSubject') or 'None'}
+Session Summary: {session_context.get('sessionSummary') or 'No previous history'}
+
+Search Results from Sanity Database (top 5):
+{json.dumps(search_results[:5], indent=2, default=str) if search_results else '[]'}
+
+Note: You are GetMEDS AI Assist. Stay within GetMEDS context only.
+Use only the data provided above — do not invent product information.
+
+{lang_instruction}
+
+Current User Message: {user_message}
+---
+
+Respond ONLY with a valid JSON object. No preamble, no markdown code fences.
+Required format:
+{{
+  "answer": "your reply in markdown",
+  "resources": [
+    {{"title": "...", "url": "...", "type": "product|category|page|article"}}
+  ]
+}}
+Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /order-medicines, /contact-us, /pap, /about-us, /services, /global-presence, /careers, /articles, /csr, /ungc, /meditations).
+"""
+
+    models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    for model in models:
+        try:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": context_block}
+                ],
+                "temperature": 0.2,
+                "max_tokens": 1024,
+                "response_format": {"type": "json_object"}
+            }
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code == 200:
+                    data = response.json()
+                    raw = data["choices"][0]["message"]["content"].strip()
+                    if raw.startswith("```"):
+                        raw = re.sub(r"^```[a-z]*\n?", "", raw)
+                        raw = re.sub(r"\n?```$", "", raw)
+                    raw = raw.strip()
+
+                    parsed = json.loads(raw)
+                    resources = [
+                        ResourceLink(
+                            title=r.get("title", ""),
+                            url=r.get("url", "#"),
+                            type=r.get("type", "page")
+                        )
+                        for r in parsed.get("resources", [])
+                        if r.get("title") and r.get("url")
+                    ]
+                    answer = parsed.get("answer", "").strip()
+                    if answer:
+                        print(f"INFO: Groq responder succeeded with model '{model}' for message: {user_message[:60]}...")
+                        return ChatResponse(answer=answer, resources=resources, confidence=1.0)
+                else:
+                    print(f"WARNING: Groq call failed with status {response.status_code} for model {model}: {response.text}")
+        except Exception as e:
+            print(f"WARNING: Groq call with model {model} failed: {type(e).__name__}: {e}")
+
+    return None
+
+
 # ── Main Chatbot Service ────────────────────────────────────────────────────
 
 class ChatbotService:
@@ -431,8 +550,30 @@ class ChatbotService:
                     search_results=search_results,
                     lang=lang
                 )
-            elif name == "trained_assistant":
-                print(f"INFO: Trying trained assistant responder: {user_message[:60]}...")
+            elif name in ("trained_assistant", "groq_ai"):
+                try:
+                    import main as app_main
+                    system_prompt = getattr(app_main, "COMBINED_SYSTEM_PROMPT", "")
+                except Exception:
+                    system_prompt = ""
+                session_context = {
+                    "sessionId": session_id,
+                    "userName": effective_name,
+                    "lastSubject": effective_subject,
+                    "sessionSummary": session_summary
+                }
+                print(f"INFO: Trying Groq AI responder: {user_message[:60]}...")
+                resp = await _call_groq(
+                    system_prompt=system_prompt,
+                    user_message=user_message,
+                    session_context=session_context,
+                    search_results=search_results,
+                    lang=lang
+                )
+                if resp is not None:
+                    return resp
+                
+                print(f"WARNING: Groq responder failed or key missing. Falling back to local rule-based assistant...")
                 return await self._rule_based_response(
                     query=query,
                     query_clean=query_clean,

@@ -69,10 +69,15 @@ async def append_to_spreadsheet(request: AppendSpreadsheetRequest):
                     continue
                 try:
                     file_bytes = base64.b64decode(file.base64)
-                    upload_url = f"https://{settings.SANITY_PROJECT_ID}.api.sanity.io/v1/assets/images/{settings.SANITY_DATASET}"
+                    
+                    # Detect PDF to route to the correct Sanity asset endpoint
+                    is_pdf = (file.type and file.type == "application/pdf") or file.name.lower().endswith(".pdf")
+                    asset_type = "files" if is_pdf else "images"
+                    
+                    upload_url = f"https://{settings.SANITY_PROJECT_ID}.api.sanity.io/v1/assets/{asset_type}/{settings.SANITY_DATASET}"
                     headers = {
                         "Authorization": f"Bearer {settings.SANITY_TOKEN}",
-                        "Content-Type": file.type or "image/jpeg"
+                        "Content-Type": file.type or ("application/pdf" if is_pdf else "image/jpeg")
                     }
                     async with httpx.AsyncClient() as client:
                         response = await client.post(upload_url, headers=headers, content=file_bytes)
