@@ -56,8 +56,9 @@ async def root():
     return {
         "message": "Welcome to GetMEDS Chatbot API",
         "version": "2.0.0",
-        "primary": "anthropic-claude" if settings.ANTHROPIC_API_KEY else "trained-assistant",
-        "fallback": "trained-assistant" if settings.ANTHROPIC_API_KEY else "static-response",
+        "primary": settings.PRIMARY,
+        "secondary": settings.SECONDARY,
+        "tertiary": settings.TERTIARY,
         "skills_loaded": bool(COMBINED_SYSTEM_PROMPT)
     }
 
@@ -66,7 +67,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "GetMEDS Chatbot",
-        "mode": "anthropic-primary / trained-fallback" if settings.ANTHROPIC_API_KEY else "trained-primary / static-fallback"
+        "mode": f"{settings.PRIMARY} / {settings.SECONDARY} / {settings.TERTIARY}"
     }
 
 if __name__ == "__main__":

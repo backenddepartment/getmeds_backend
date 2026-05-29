@@ -150,11 +150,18 @@ async def _call_groq(
 ) -> ChatResponse | None:
     """
     Calls Groq Cloud API as a responder.
+    Rotates through multiple GROQ_API_KEY values if one fails.
     Tries llama-3.1-8b-instant first, and falls back to other models if needed.
     """
     import httpx
     if not settings.GROQ_API_KEY:
         print("INFO: GROQ_API_KEY not set — skipping Groq responder")
+        return None
+
+    # Parse key list
+    keys = [k.strip() for k in settings.GROQ_API_KEY.split(",") if k.strip()]
+    if not keys:
+        print("INFO: GROQ_API_KEY format is invalid or empty — skipping Groq responder")
         return None
 
     # Define target language style instruction
@@ -211,51 +218,55 @@ Maximum 3 resource links. Only use URLs that exist in GetMEDS (/product-range, /
 
     models = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
 
-    for model in models:
-        try:
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": context_block}
-                ],
-                "temperature": 0.2,
-                "max_tokens": 1024,
-                "response_format": {"type": "json_object"}
-            }
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                if response.status_code == 200:
-                    data = response.json()
-                    raw = data["choices"][0]["message"]["content"].strip()
-                    if raw.startswith("```"):
-                        raw = re.sub(r"^```[a-z]*\n?", "", raw)
-                        raw = re.sub(r"\n?```$", "", raw)
-                    raw = raw.strip()
+    for api_key in keys:
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        for model in models:
+            try:
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": context_block}
+                    ],
+                    "temperature": 0.2,
+                    "max_tokens": 1024,
+                    "response_format": {"type": "json_object"}
+                }
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    response = await client.post(url, headers=headers, json=payload)
+                    if response.status_code == 200:
+                        data = response.json()
+                        raw = data["choices"][0]["message"]["content"].strip()
+                        if raw.startswith("```"):
+                            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+                            raw = re.sub(r"\n?```$", "", raw)
+                        raw = raw.strip()
 
-                    parsed = json.loads(raw)
-                    resources = [
-                        ResourceLink(
-                            title=r.get("title", ""),
-                            url=r.get("url", "#"),
-                            type=r.get("type", "page")
-                        )
-                        for r in parsed.get("resources", [])
-                        if r.get("title") and r.get("url")
-                    ]
-                    answer = parsed.get("answer", "").strip()
-                    if answer:
-                        print(f"INFO: Groq responder succeeded with model '{model}' for message: {user_message[:60]}...")
-                        return ChatResponse(answer=answer, resources=resources, confidence=1.0)
-                else:
-                    print(f"WARNING: Groq call failed with status {response.status_code} for model {model}: {response.text}")
-        except Exception as e:
-            print(f"WARNING: Groq call with model {model} failed: {type(e).__name__}: {e}")
+                        parsed = json.loads(raw)
+                        resources = [
+                            ResourceLink(
+                                title=r.get("title", ""),
+                                url=r.get("url", "#"),
+                                type=r.get("type", "page")
+                            )
+                            for r in parsed.get("resources", [])
+                            if r.get("title") and r.get("url")
+                        ]
+                        answer = parsed.get("answer", "").strip()
+                        if answer:
+                            print(f"INFO: Groq responder succeeded with model '{model}' for message: {user_message[:60]}...")
+                            return ChatResponse(answer=answer, resources=resources, confidence=1.0)
+                    elif response.status_code in [401, 403, 429]:
+                        print(f"WARNING: Groq key {api_key[:12]}... failed with status {response.status_code}. Trying next key...")
+                        break # Break models loop to try next key
+                    else:
+                        print(f"WARNING: Groq call failed with status {response.status_code} for model {model}: {response.text}")
+            except Exception as e:
+                print(f"WARNING: Groq call with model {model} failed using key {api_key[:12]}...: {type(e).__name__}: {e}")
 
     return None
 
@@ -521,8 +532,9 @@ class ChatbotService:
             search_results = await sanity_service.search_content(clean_search)
 
         resp = None
-        primary_responder = settings.PRIMARY.lower().strip() if settings.PRIMARY else "trained_assistant"
-        secondary_responder = settings.SECONDARY.lower().strip() if settings.SECONDARY else "anthropic_ai"
+        primary_responder = settings.PRIMARY.lower().strip() if settings.PRIMARY else "anthropic_ai"
+        secondary_responder = settings.SECONDARY.lower().strip() if settings.SECONDARY else "trained_assistant"
+        tertiary_responder = settings.TERTIARY.lower().strip() if settings.TERTIARY else "groq_ai"
         
         responders_tried = []
 
@@ -550,7 +562,7 @@ class ChatbotService:
                     search_results=search_results,
                     lang=lang
                 )
-            elif name in ("trained_assistant", "groq_ai"):
+            elif name == "groq_ai":
                 try:
                     import main as app_main
                     system_prompt = getattr(app_main, "COMBINED_SYSTEM_PROMPT", "")
@@ -563,17 +575,15 @@ class ChatbotService:
                     "sessionSummary": session_summary
                 }
                 print(f"INFO: Trying Groq AI responder: {user_message[:60]}...")
-                resp = await _call_groq(
+                return await _call_groq(
                     system_prompt=system_prompt,
                     user_message=user_message,
                     session_context=session_context,
                     search_results=search_results,
                     lang=lang
                 )
-                if resp is not None:
-                    return resp
-                
-                print(f"WARNING: Groq responder failed or key missing. Falling back to local rule-based assistant...")
+            elif name == "trained_assistant":
+                print(f"INFO: Trying trained assistant responder: {user_message[:60]}...")
                 return await self._rule_based_response(
                     query=query,
                     query_clean=query_clean,
@@ -597,11 +607,18 @@ class ChatbotService:
             responders_tried.append(primary_responder)
 
         # ── Call Secondary Responder (Fallback) ──────────────────────────────
-        # Triggers if the primary responder failed (returned None) or if it's the trained engine and returned fallback sentinel
         if resp is None or resp.answer == _FALLBACK_SENTINEL:
             if secondary_responder and secondary_responder not in responders_tried:
                 print(f"WARNING: Primary responder '{primary_responder}' failed or returned fallback. Falling back to secondary '{secondary_responder}'...")
                 resp = await try_responder(secondary_responder)
+                responders_tried.append(secondary_responder)
+
+        # ── Call Tertiary Responder (Fallback) ───────────────────────────────
+        if resp is None or resp.answer == _FALLBACK_SENTINEL:
+            if tertiary_responder and tertiary_responder not in responders_tried:
+                print(f"WARNING: Secondary responder '{secondary_responder}' failed or returned fallback. Falling back to tertiary '{tertiary_responder}'...")
+                resp = await try_responder(tertiary_responder)
+                responders_tried.append(tertiary_responder)
 
         # ── Step 5: Static Last-Resort ────────────────────────────────────────
         # Triggered if the fallback rule-based assistant also couldn't handle it

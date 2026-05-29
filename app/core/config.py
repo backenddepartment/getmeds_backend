@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
 
     # Chatbot Routing Configuration
-    PRIMARY: str = "trained_assistant"
-    SECONDARY: str = "anthropic_ai"
+    PRIMARY: str = "anthropic_ai"
+    SECONDARY: str = "trained_assistant"
+    TERTIARY: str = "groq_ai"
 
     # App Configuration
     APP_NAME: str = "GetMEDS Chatbot API"
