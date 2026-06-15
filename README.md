@@ -1,4 +1,4 @@
-# GetMEDS Chatbot API
+# Getmeds Chatbot API
 
 A hyper-contextual AI sales assistant API built with FastAPI that eliminates hallucinations by strictly locking context on user intents. This is a stripped-down version containing only the chatbot API endpoints.
 
@@ -96,7 +96,7 @@ Health check endpoint for the chatbot service.
 ```json
 {
   "status": "online",
-  "service": "GetMEDS Chatbot API"
+  "service": "Getmeds Chatbot API"
 }
 ```
 
@@ -107,7 +107,7 @@ General health check for the API.
 ```json
 {
   "status": "healthy",
-  "service": "GetMEDS Chatbot"
+  "service": "Getmeds Chatbot"
 }
 ```
 
@@ -154,7 +154,7 @@ Each conversation is tracked with a unique `session_id`. The service maintains:
 
 The chatbot uses Sanity CMS as the content backend with support for:
 - **Products**: Medicine and healthcare products
-- **Services**: GetMEDS services and offerings
+- **Services**: Getmeds services and offerings
 - **Team Members**: Staff directory with roles
 - **FAQs**: Frequently asked questions
 
@@ -211,8 +211,8 @@ Modify `allowed_origins` in `app/core/config.py` to restrict as needed.
 
 ## Support
 
-For issues or questions, please refer to the main GetMEDS documentation or contact the development team.
+For issues or questions, please refer to the main Getmeds documentation or contact the development team.
 
 ## License
 
-This project is part of the GetMEDS platform.
+This project is part of the Getmeds platform.

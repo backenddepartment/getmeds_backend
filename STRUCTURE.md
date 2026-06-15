@@ -1,4 +1,4 @@
-# GetMEDS Chatbot API - Structure & Changes
+# Getmeds Chatbot API - Structure & Changes
 
 ## What Was Removed ❌
 

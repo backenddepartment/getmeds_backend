@@ -1,4 +1,4 @@
-# Quick Start Guide - GetMEDS Chatbot API
+# Quick Start Guide - Getmeds Chatbot API
 
 ## 5-Minute Setup
 

@@ -9,62 +9,74 @@ from typing import List, Dict, Optional
 
 from app.core.config import settings
 
+
 class EmailService:
-    def send_inquiry_email(
-        self,
-        inquiry_type: str,
-        full_name: str,
-        email: str,
-        phone: str,
-        message: str,
-        subject: str,
-        additional_data: dict,
-        file_links: List[str],
-        files: List[Dict[str, str]],
-        recipient_emails: List[str],
-        default_email: str = "info@getmeds.ph"
-    ) -> bool:
+
+    def send_inquiry_email(self,
+                           inquiry_type: str,
+                           full_name: str,
+                           email: str,
+                           phone: str,
+                           message: str,
+                           subject: str,
+                           additional_data: dict,
+                           file_links: List[str],
+                           files: List[Dict[str, str]],
+                           recipient_emails: List[str],
+                           default_email: str = "info@getmeds.ph") -> bool:
         """
         Builds and sends an HTML email for an inquiry.
         Attaches the raw files directly to the email.
         """
         # Always email to resolved default_email in addition to custom recipients
-        all_recipients = list(set([default_email] + [r.strip() for r in recipient_emails if r.strip()]))
-        
+        all_recipients = list(
+            set([default_email] +
+                [r.strip() for r in recipient_emails if r.strip()]))
+
         # Build HTML Body
-        html_content = self._build_email_html(
-            inquiry_type, full_name, email, phone, message, subject, additional_data, file_links
-        )
-        
+        html_content = self._build_email_html(inquiry_type, full_name, email,
+                                              phone, message, subject,
+                                              additional_data, file_links)
+
         # Determine explicit subject line based on inquiry type to prevent confusion
         if inquiry_type == "Career Inquiry":
             position = additional_data.get("position") or subject or "General"
-            email_subject = f"[GetMEDS Career Inquiry] Position: {position} - {full_name}"
+            email_subject = f"[Getmeds Career Inquiry] Position: {position} - {full_name}"
         elif inquiry_type == "Contact Us":
-            sub_text = subject or additional_data.get("subject") or "General Inquiry"
-            email_subject = f"[GetMEDS Contact Us] {sub_text} - {full_name}"
+            sub_text = subject or additional_data.get(
+                "subject") or "General Inquiry"
+            email_subject = f"[Getmeds Contact Us] {sub_text} - {full_name}"
         elif inquiry_type == "Product Inquiry":
             prod_name = additional_data.get("productName") or "General"
-            email_subject = f"[GetMEDS Product Inquiry] Product: {prod_name} - {full_name}"
+            email_subject = f"[Getmeds Product Inquiry] Product: {prod_name} - {full_name}"
         elif inquiry_type == "Order Medicine":
-            email_subject = f"[GetMEDS Order Medicine] Prescription Request - {full_name}"
+            email_subject = f"[Getmeds Order Medicine] Prescription Request - {full_name}"
         elif inquiry_type == "Partnership":
-            sub_text = subject or additional_data.get("subject") or "Partnership Inquiry"
-            email_subject = f"[GetMEDS Partnership] {sub_text} - {full_name}"
+            sub_text = subject or additional_data.get(
+                "subject") or "Partnership Inquiry"
+            email_subject = f"[Getmeds Partnership] {sub_text} - {full_name}"
         else:
-            email_subject = f"[GetMEDS Website Inquiry] {inquiry_type} - {full_name}"
-        
+            email_subject = f"[Getmeds Website Inquiry] {inquiry_type} - {full_name}"
+
         # Check if SMTP is configured
         if not settings.SMTP_HOST:
-            print("======================================================================")
+            print(
+                "======================================================================"
+            )
             print("[SIMULATED EMAIL DISPATCH]")
             print(f"To: {', '.join(all_recipients)}")
             print(f"From: {settings.SMTP_FROM}")
             print(f"Subject: {email_subject}")
-            print(f"Attachments: {[f.get('name') for f in files if f.get('name')]}")
-            print("----------------------------------------------------------------------")
+            print(
+                f"Attachments: {[f.get('name') for f in files if f.get('name')]}"
+            )
+            print(
+                "----------------------------------------------------------------------"
+            )
             print(f"Body preview: {html_content[:500]}...")
-            print("======================================================================")
+            print(
+                "======================================================================"
+            )
             return True
 
         try:
@@ -91,14 +103,14 @@ class EmailService:
                         part = MIMEBase("application", "octet-stream")
                         part.set_payload(file_data)
                         encoders.encode_base64(part)
-                        part.add_header(
-                            "Content-Disposition",
-                            f'attachment; filename="{file_name}"'
-                        )
+                        part.add_header("Content-Disposition",
+                                        f'attachment; filename="{file_name}"')
                         msg.attach(part)
                         print(f"INFO: Attached file '{file_name}' to email.")
                     except Exception as attach_err:
-                        print(f"ERROR: Failed to attach file '{file_name}': {attach_err}")
+                        print(
+                            f"ERROR: Failed to attach file '{file_name}': {attach_err}"
+                        )
 
             # Connect and send
             port = int(settings.SMTP_PORT)
@@ -107,11 +119,12 @@ class EmailService:
             else:
                 server = smtplib.SMTP(settings.SMTP_HOST, port, timeout=15)
                 server.starttls()
-            
+
             if settings.SMTP_USER and settings.SMTP_PASSWORD:
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            
-            server.sendmail(settings.SMTP_FROM, all_recipients, msg.as_string())
+
+            server.sendmail(settings.SMTP_FROM, all_recipients,
+                            msg.as_string())
             server.quit()
             print(f"INFO: Inquiry email sent successfully to {all_recipients}")
             return True
@@ -120,19 +133,11 @@ class EmailService:
             print(f"ERROR: SMTP email dispatch failed: {smtp_err}")
             return False
 
-    def _build_email_html(
-        self,
-        inquiry_type: str,
-        full_name: str,
-        email: str,
-        phone: str,
-        message: str,
-        subject: str,
-        additional_data: dict,
-        file_links: List[str]
-    ) -> str:
+    def _build_email_html(self, inquiry_type: str, full_name: str, email: str,
+                          phone: str, message: str, subject: str,
+                          additional_data: dict, file_links: List[str]) -> str:
         additional_rows = ""
-        
+
         # Add special fields based on type
         if inquiry_type == "Career Inquiry":
             position = additional_data.get("position") or subject
@@ -166,8 +171,11 @@ class EmailService:
 
         attachments_row = ""
         if file_links:
-            links_html = ", ".join([f"<a href='{link}' target='_blank'>{link.split('/')[-1]}</a>" for link in file_links])
-            attachments_row = f"<tr><td><b>Uploaded Assets (Sanity):</b></td><td>{links_html}</td></tr>"
+            links_html = ", ".join([
+                f"<a href='{link}' target='_blank'>{link.split('/')[-1]}</a>"
+                for link in file_links
+            ])
+            attachments_row = f"<tr><td><b>Uploaded Asset:</b></td><td>{links_html}</td></tr>"
 
         html = f"""
         <html>
@@ -195,7 +203,7 @@ class EmailService:
                 </div>
                 <div class="content">
                     <p style="margin-top: 0; font-size: 15px;">Hello team,</p>
-                    <p style="font-size: 14px; color: #4A5568;">A new inquiry has been submitted from the GetMEDS website. Please review the details below:</p>
+                    <p style="font-size: 14px; color: #4A5568;">A new inquiry has been submitted from the Getmeds website. Please review the details below:</p>
                     <table class="table">
                         <tr>
                             <td><b>Sender Name:</b></td>
@@ -213,12 +221,13 @@ class EmailService:
                     <div class="message-box">{message or "<i>No text message provided.</i>"}</div>
                 </div>
                 <div class="footer">
-                    <p>This is an automated notification from the GetMEDS website inquiry gateway.</p>
+                    <p>This is an automated notification from the Getmeds website inquiry gateway.</p>
                 </div>
             </div>
         </body>
         </html>
         """
         return html
+
 
 email_service = EmailService()

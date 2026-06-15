@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
 
+
 class Settings(BaseSettings):
     # Sanity Configuration
     SANITY_PROJECT_ID: str = "s7ocz8zp"
@@ -33,27 +34,26 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "info@getmeds.ph"
 
     # App Configuration
-    APP_NAME: str = "GetMEDS Chatbot API"
+    APP_NAME: str = "Getmeds Chatbot API"
     DEBUG: bool = False
     PORT: int = 8000
     CHAT_HISTORY_LIMIT: int = 30
-    
+
     # CORS Configuration
     allowed_origins: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:8000",
-        "https://getmeds.app",
-        "*"
+        "http://localhost:3000", "http://localhost:5173",
+        "http://127.0.0.1:5173", "http://localhost:8000",
+        "https://getmeds.app", "*"
     ]
 
     class Config:
         env_file = ".env"
         extra = "ignore"  # Ignore extra fields from .env
 
+
 @lru_cache()
 def get_settings():
     return Settings()
+
 
 settings = get_settings()

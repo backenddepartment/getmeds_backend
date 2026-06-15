@@ -1,5 +1,5 @@
 # AI_SKILL_CHATBOT.md
-## GetMEDS AI Assist — Categorization & Data Routing Skill
+## Getmeds AI Assist — Categorization & Data Routing Skill
 
 > **Purpose:** This document trains the AI on how to categorize every user question and where to find the correct answer — either from the **Sanity database** (products, categories, FAQs, teams) or from **frontend page context** (services, company info, pages, navigation suggestions). The AI must never hallucinate. It must only answer with what it can verify from these two data sources.
 
@@ -7,7 +7,7 @@
 
 ## 1. Who This Chatbot Serves
 
-GetMEDS is a **specialty pharmaceutical importer and distributor** in the Philippines. The chatbot serves:
+Getmeds is a **specialty pharmaceutical importer and distributor** in the Philippines. The chatbot serves:
 
 - **Patients / Caregivers** looking for specific specialty medications
 - **Healthcare Professionals (HCPs)** inquiring about drug indications and supply
@@ -25,7 +25,7 @@ Used for all product-specific, clinical, and operational queries.
 
 | Schema Type | What It Contains | Key Fields |
 |---|---|---|
-| `product` | All medicines GetMEDS carries | `brandName`, `genericName`, `form`, `strength`, `indications`, `dosageAdministration`, `mechanismOfAction`, `storageCondition`, `directionForReconstitution`, `availability`, `supplier`, `importer`, `distributor`, `accreditations`, `country` |
+| `product` | All medicines Getmeds carries | `brandName`, `genericName`, `form`, `strength`, `indications`, `dosageAdministration`, `mechanismOfAction`, `storageCondition`, `directionForReconstitution`, `availability`, `supplier`, `importer`, `distributor`, `accreditations`, `country` |
 | `category` | Therapeutic categories | `category` (name), `subtitle`, `description`, `subcategory[]`, `slug` |
 | `faq` | Help & policy questions | `question`, `answer`, `keywords[]`, `relatedLinks[]` |
 | `teams` | Staff / management | `name`, `designation` |
@@ -44,7 +44,7 @@ Used for company identity, navigation help, and page-level information.
 
 | Page | What It Contains |
 |---|---|
-| `/` (Home) | GetMEDS overview, key stats (e.g. years in operation, brands), therapeutic pillars, partnership CTA, FAQ section |
+| `/` (Home) | Getmeds overview, key stats (e.g. years in operation, brands), therapeutic pillars, partnership CTA, FAQ section |
 | `/about-us` | Company history, mission, vision, core values, leadership |
 | `/services` | Service descriptions: regulatory compliance, government bidding, digital oncology, distribution |
 | `/product-range` | Product catalog UI; categories sidebar (Oncology, Hematology, Immunology, Cardiology, Nephrology, Anti-infectives, etc.) |
@@ -59,7 +59,7 @@ Used for company identity, navigation help, and page-level information.
 | `/articles` | News and editorial articles |
 
 **When to use SOURCE B:**
-- Company background or identity questions ("Who is GetMEDS?")
+- Company background or identity questions ("Who is Getmeds?")
 - Navigation help ("Where do I order?" / "How do I apply for PAP?")
 - Service descriptions
 - Contact info and office locations
@@ -148,9 +148,9 @@ Route to `/pap` page. Describe: eligibility criteria, application process, what 
 ---
 
 ### CATEGORY 5 — Company / About → SOURCE B (Frontend: `/about-us`, `/`)
-**Triggers:** "what is GetMEDS", "who are you", "company info", "history", "mission", "vision", "how long"
+**Triggers:** "what is Getmeds", "who are you", "company info", "history", "mission", "vision", "how long"
 
-Describe GetMEDS as a specialty pharmaceutical importer. Reference: years in operation, product count, partnerships, mission statement.
+Describe Getmeds as a specialty pharmaceutical importer. Reference: years in operation, product count, partnerships, mission statement.
 
 ---
 
@@ -293,4 +293,4 @@ Maximum 3 resources per response. Do not repeat the same URL twice in one respon
 4. **Never confirm a stock status not present in the `availability` field.**
 5. **Never route to a page that doesn't exist** in the page list above.
 6. **Never retain context from a previous session** (sessions are separate by `session_id`).
-7. **Never answer questions outside the GetMEDS domain** (general health trivia, competitor pricing, etc.).
+7. **Never answer questions outside the Getmeds domain** (general health trivia, competitor pricing, etc.).
