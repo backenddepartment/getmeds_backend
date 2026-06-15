@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas.inquiry import InquirySubmitRequest
 from app.core.config import settings
-from app.services import sanity_service
+from app.services.sanity_service import sanity_service
 from app.services.email_service import email_service
 from app.api.routes.spreadsheet import clean_spreadsheet_id, get_google_services
 
@@ -62,12 +62,32 @@ async def submit_inquiry(request: InquirySubmitRequest):
         
         try:
             groq_query = '*[_type == "inquiryRouting" && inquiryType == $inquiryType][0]{ recipients, "spreadsheetId": spreadsheet->spreadsheetId }'
-            routing_rule = await sanity_service.query_sanity(groq_query, {"inquiryType": request.inquiryType})
+            routing_rule = await sanity_service.query_sanity(groq_query, {"$inquiryType": request.inquiryType})
             if routing_rule:
                 recipients = routing_rule.get("recipients") or []
                 spreadsheet_id = routing_rule.get("spreadsheetId")
         except Exception as query_err:
             print(f"WARNING: Failed to query Sanity for inquiry routing rule: {query_err}")
+
+        # Fallback to query googleSpreadsheet document directly if no routing rule exists
+        if not spreadsheet_id:
+            slug_map = {
+                "Career Inquiry": "careers-inquiry-list",
+                "Contact Us": "contact-us-list",
+                "Product Inquiry": "product-inquiry-list",
+                "Order Medicine": "order-medicine-list",
+                "Partnership": "partership-list"
+            }
+            slug = slug_map.get(request.inquiryType)
+            if slug:
+                try:
+                    sheet_query = '*[_type == "googleSpreadsheet" && id.current == $slug][0]{ spreadsheetId }'
+                    sheet_doc = await sanity_service.query_sanity(sheet_query, {"$slug": slug})
+                    if sheet_doc:
+                        spreadsheet_id = sheet_doc.get("spreadsheetId")
+                        print(f"INFO: Resolved fallback spreadsheet for '{request.inquiryType}' matching slug '{slug}': {spreadsheet_id}")
+                except Exception as fallback_err:
+                    print(f"WARNING: Failed to query fallback googleSpreadsheet by slug: {fallback_err}")
 
         # 3. Store in Designated Google Spreadsheet (if configured)
         sheets_appended = False
@@ -214,10 +234,32 @@ async def submit_inquiry(request: InquirySubmitRequest):
             recipient_emails=recipients
         )
 
+        spreadsheet_link = f"https://docs.google.com/spreadsheets/d/{clean_spreadsheet_id(spreadsheet_id)}" if spreadsheet_id else "N/A - No designated spreadsheet in Sanity"
+        all_emails = list(set(["info@getmeds.ph"] + [r.strip() for r in recipients if r.strip()]))
+
+        # Verbose terminal print logs
+        print("==============================================================")
+        print("                   GETMEDS INQUIRY SUBMITTED                  ")
+        print("==============================================================")
+        print(f"Inquiry Type:      {request.inquiryType}")
+        print(f"Full Name:         {request.fullName}")
+        print(f"Email Address:     {request.email}")
+        print(f"Phone Number:      {request.phone or 'N/A'}")
+        print(f"Subject / Context: {request.subject or 'N/A'}")
+        print(f"Spreadsheet Link:  {spreadsheet_link}")
+        print(f"Email Recipients:  {', '.join(all_emails)}")
+        print(f"Attached Files:    {[f.name for f in request.files] if request.files else 'None'}")
+        print(f"Sanity File Links: {file_links if file_links else 'None'}")
+        print(f"Sheets Appended:   {sheets_appended}")
+        print(f"Email Sent:        {email_sent}")
+        print("==============================================================")
+
         return {
             "success": True,
             "sheets_appended": sheets_appended,
             "email_sent": email_sent,
+            "spreadsheet_link": spreadsheet_link,
+            "email_recipients": all_emails,
             "sanity_files": file_links
         }
 

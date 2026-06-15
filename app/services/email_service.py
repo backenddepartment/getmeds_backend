@@ -21,14 +21,15 @@ class EmailService:
         additional_data: dict,
         file_links: List[str],
         files: List[Dict[str, str]],
-        recipient_emails: List[str]
+        recipient_emails: List[str],
+        default_email: str = "info@getmeds.ph"
     ) -> bool:
         """
         Builds and sends an HTML email for an inquiry.
         Attaches the raw files directly to the email.
         """
-        # Always email to info@getmeds.ph in addition to custom recipients
-        all_recipients = list(set(["info@getmeds.ph"] + [r.strip() for r in recipient_emails if r.strip()]))
+        # Always email to resolved default_email in addition to custom recipients
+        all_recipients = list(set([default_email] + [r.strip() for r in recipient_emails if r.strip()]))
         
         # Build HTML Body
         html_content = self._build_email_html(
