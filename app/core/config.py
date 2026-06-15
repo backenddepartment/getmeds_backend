@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     SECONDARY: str = "trained_assistant"
     TERTIARY: str = "groq_ai"
 
+    # SMTP Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "info@getmeds.ph"
+
     # App Configuration
     APP_NAME: str = "GetMEDS Chatbot API"
     DEBUG: bool = False
