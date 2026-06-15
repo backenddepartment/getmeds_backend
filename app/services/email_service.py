@@ -36,7 +36,23 @@ class EmailService:
             inquiry_type, full_name, email, phone, message, subject, additional_data, file_links
         )
         
-        email_subject = f"[GetMEDS Website Inquiry] {inquiry_type} - {full_name}"
+        # Determine explicit subject line based on inquiry type to prevent confusion
+        if inquiry_type == "Career Inquiry":
+            position = additional_data.get("position") or subject or "General"
+            email_subject = f"[GetMEDS Career Inquiry] Position: {position} - {full_name}"
+        elif inquiry_type == "Contact Us":
+            sub_text = subject or additional_data.get("subject") or "General Inquiry"
+            email_subject = f"[GetMEDS Contact Us] {sub_text} - {full_name}"
+        elif inquiry_type == "Product Inquiry":
+            prod_name = additional_data.get("productName") or "General"
+            email_subject = f"[GetMEDS Product Inquiry] Product: {prod_name} - {full_name}"
+        elif inquiry_type == "Order Medicine":
+            email_subject = f"[GetMEDS Order Medicine] Prescription Request - {full_name}"
+        elif inquiry_type == "Partnership":
+            sub_text = subject or additional_data.get("subject") or "Partnership Inquiry"
+            email_subject = f"[GetMEDS Partnership] {sub_text} - {full_name}"
+        else:
+            email_subject = f"[GetMEDS Website Inquiry] {inquiry_type} - {full_name}"
         
         # Check if SMTP is configured
         if not settings.SMTP_HOST:
