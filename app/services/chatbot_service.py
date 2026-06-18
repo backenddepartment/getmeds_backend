@@ -264,6 +264,7 @@ Maximum 3 resource links. Only use URLs that exist in Getmeds (/product-range, /
         response = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
+            temperature=0.0,
             system=system_prompt,
             messages=[{
                 "role": "user",
@@ -431,7 +432,7 @@ Rules:
                         "content": context_block
                     }],
                     "temperature":
-                    0.2,
+                    0.0,
                     "max_tokens":
                     1024,
                     "response_format": {
@@ -800,6 +801,43 @@ class ChatbotService:
         elif clean_search.strip():
             search_results = await sanity_service.search_content(clean_search)
 
+        # ── Data policy: Sanity-only mode ───────────────────────────────────
+        # "Sanity-only" means: use only Sanity search results as the truth source.
+        # LLM responders can still be used, but page_context is not passed through,
+        # and responders are instructed to refuse answering when Sanity has no match.
+        sanity_only = bool(getattr(settings, "CHATBOT_SANITY_ONLY", False))
+        if sanity_only:
+            page_context = None
+
+            # Hard stop: if Sanity has no matches, do NOT call any LLM responder.
+            # This prevents false positives like "I found X" when X isn't in the catalog.
+            if not search_results:
+                resp = await self._rule_based_response(
+                    query=query,
+                    query_clean=query_clean,
+                    user_message=user_message,
+                    effective_name=effective_name,
+                    effective_subject=effective_subject,
+                    last_ai_msg=last_ai_msg,
+                    is_confirmation=is_confirmation,
+                    search_results=search_results,
+                    matched_category=matched_category,
+                    matched_subcategory=matched_subcategory,
+                    lang=lang)
+
+                detected_subject = None
+                for r in resp.resources:
+                    if r.type == "product" and "Inquire" in r.title:
+                        detected_subject = r.title.replace("Inquire ", "")
+                        break
+                final_subject = detected_subject or effective_subject
+                await sanity_service.save_chat_turn(session_id,
+                                                    user_message,
+                                                    resp.answer,
+                                                    resources=resp.resources,
+                                                    last_subject=final_subject)
+                return resp
+
         primary_responder = settings.PRIMARY.lower().strip(
         ) if settings.PRIMARY else "anthropic_ai"
         secondary_responder = settings.SECONDARY.lower().strip(
@@ -808,6 +846,22 @@ class ChatbotService:
         ) if settings.TERTIARY else "groq_ai"
 
         responders_tried = []
+
+        def _apply_sanity_only_guard(system_prompt: str) -> str:
+            if not sanity_only:
+                return system_prompt or ""
+            guard = """
+SANITY-ONLY MODE (STRICT):
+- You must ONLY use the provided "Search Results from Sanity Database" to answer.
+- Do NOT use general knowledge, web knowledge, or assumptions.
+- Do NOT use page context (none will be provided).
+- If the Search Results list is empty, you MUST reply that the item/info is not found in the Getmeds catalog (Sanity database) and suggest:
+  1) Search Products: /product-range?search=<query>
+  2) Contact Us: /contact-us
+- Never mention competitors or non-Getmeds products. If the user asks outside Getmeds, redirect to /contact-us.
+"""
+            base = (system_prompt or "").strip()
+            return (base + "\n\n" + guard.strip()).strip()
 
         async def try_responder(name):
             if name == "anthropic_ai":
@@ -822,6 +876,7 @@ class ChatbotService:
                                             "")
                 except Exception:
                     system_prompt = ""
+                system_prompt = _apply_sanity_only_guard(system_prompt)
                 session_context = {
                     "sessionId": session_id,
                     "userName": effective_name,
@@ -842,6 +897,7 @@ class ChatbotService:
                                             "")
                 except Exception:
                     system_prompt = ""
+                system_prompt = _apply_sanity_only_guard(system_prompt)
                 session_context = {
                     "sessionId": session_id,
                     "userName": effective_name,
@@ -991,6 +1047,45 @@ class ChatbotService:
         Returns ChatResponse(answer='__FALLBACK__', confidence=0.0) when it cannot,
         which signals the orchestrator to try static fallback instead.
         """
+        # If Sanity returns nothing, we must not "guess" from general knowledge.
+        # Provide a safe, Sanity-backed response instead of letting an LLM hallucinate.
+        if not search_results:
+            # Heuristic: treat short keyword queries as product searches (e.g., "biogesic")
+            keywords = [w for w in query_clean.split() if w and w not in _STOP_WORDS]
+            candidate = " ".join(keywords).strip() or user_message.strip()
+
+            from urllib.parse import quote_plus
+            search_q = quote_plus(candidate) if candidate else ""
+            search_url = f"/product-range?search={search_q}" if search_q else "/product-range"
+
+            not_found_msgs = {
+                "en":
+                f"I couldn't find **{candidate}** in our Getmeds catalog (Sanity database). You can try searching our Product Range, or contact our team so we can confirm availability for you.",
+                "tl":
+                f"Pasensya na po, wala akong nahanap na **{candidate}** sa catalog ng Getmeds (Sanity database). Maaari ninyong subukan i-search sa Product Range, o kontakin ang aming team para ma-check namin ang availability.",
+                "tg":
+                f"Pasensya na po, wala akong nahanap na **{candidate}** sa catalog ng Getmeds (Sanity database). Pwede ninyong i-search sa Product Range, or contact our team para ma-check namin ang availability po."
+            }
+            answer = not_found_msgs.get(lang, not_found_msgs["en"])
+
+            titles = {
+                "en": ("Search Products", "Contact Us"),
+                "tl": ("Maghanap ng Produkto", "Kontakin Kami"),
+                "tg": ("Search Products po", "Contact Us po")
+            }
+            t1, t2 = titles.get(lang, titles["en"])
+
+            return ChatResponse(answer=answer,
+                                resources=[
+                                    ResourceLink(title=t1,
+                                                 url=search_url,
+                                                 type="product"),
+                                    ResourceLink(title=t2,
+                                                 url="/contact-us",
+                                                 type="page"),
+                                ],
+                                confidence=0.9)
+
         # Relevance check to prevent weak matches (e.g. single generic word matches like "philippines")
         query_words = set(query_clean.split())
         query_keywords = {w for w in query_words if w not in _STOP_WORDS}

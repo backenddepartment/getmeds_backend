@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
     CHAT_HISTORY_LIMIT: int = 30
 
+    # Chatbot Data Policy
+    # When enabled, the chatbot will ONLY use Sanity data to produce answers.
+    # It will not rely on page_context or LLM "general knowledge" to fill gaps.
+    CHATBOT_SANITY_ONLY: bool = True
+
     # CORS Configuration
     allowed_origins: List[str] = [
         "http://localhost:3000", "http://localhost:5173",
