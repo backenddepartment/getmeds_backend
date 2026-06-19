@@ -10,7 +10,7 @@ router = APIRouter()
 @router.post("/ask", response_model=ChatResponse)
 async def ask_chatbot(request_data: dict | str = Body(...)):
     """
-    Endpoint for the chatbot to receive questions and return Sanity-sourced answers.
+    Endpoint for the chatbot to receive questions and return Getmeds catalog-sourced answers.
     """
     try:
         # Handle cases where the body is sent as a string (double-encoded JSON)

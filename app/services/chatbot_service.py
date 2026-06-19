@@ -239,7 +239,7 @@ User Name: {session_context.get('userName') or 'Unknown'}
 Last Subject: {session_context.get('lastSubject') or 'None'}
 Session Summary: {session_context.get('sessionSummary') or 'No previous history'}
 
-Search Results from Sanity Database (top 5):
+Search Results from Getmeds Catalog (top 5):
 {json.dumps(search_results[:5], indent=2, default=str) if search_results else '[]'}
 
 {page_context_block}
@@ -370,7 +370,7 @@ User Name: {session_context.get('userName') or 'Unknown'}
 Last Subject: {session_context.get('lastSubject') or 'None'}
 Session Summary: {session_context.get('sessionSummary') or 'No previous history'}
 
-Search Results from Sanity Database (top 5):
+Search Results from Getmeds Catalog (top 5):
 {json.dumps(search_results[:5], indent=2, default=str) if search_results else '[]'}
 
 {page_context_block}
@@ -852,10 +852,11 @@ class ChatbotService:
                 return system_prompt or ""
             guard = """
 SANITY-ONLY MODE (STRICT):
-- You must ONLY use the provided "Search Results from Sanity Database" to answer.
+- You must ONLY use the provided "Search Results from Getmeds Catalog" to answer.
 - Do NOT use general knowledge, web knowledge, or assumptions.
 - Do NOT use page context (none will be provided).
-- If the Search Results list is empty, you MUST reply that the item/info is not found in the Getmeds catalog (Sanity database) and suggest:
+- Do NOT mention "Sanity" or any internal database/vendor name to the user. Refer to it only as "Getmeds catalog" or "our catalog".
+- If the Search Results list is empty, you MUST reply that the item/info is not found in the Getmeds catalog and suggest:
   1) Search Products: /product-range?search=<query>
   2) Contact Us: /contact-us
 - Never mention competitors or non-Getmeds products. If the user asks outside Getmeds, redirect to /contact-us.
@@ -1060,11 +1061,11 @@ SANITY-ONLY MODE (STRICT):
 
             not_found_msgs = {
                 "en":
-                f"I couldn't find **{candidate}** in our Getmeds catalog (Sanity database). You can try searching our Product Range, or contact our team so we can confirm availability for you.",
+                f"I couldn't find **{candidate}** in our Getmeds catalog. You can try searching our Product Range, or contact our team so we can confirm availability for you.",
                 "tl":
-                f"Pasensya na po, wala akong nahanap na **{candidate}** sa catalog ng Getmeds (Sanity database). Maaari ninyong subukan i-search sa Product Range, o kontakin ang aming team para ma-check namin ang availability.",
+                f"Pasensya na po, wala akong nahanap na **{candidate}** sa catalog ng Getmeds. Maaari ninyong subukan i-search sa Product Range, o kontakin ang aming team para ma-check namin ang availability.",
                 "tg":
-                f"Pasensya na po, wala akong nahanap na **{candidate}** sa catalog ng Getmeds (Sanity database). Pwede ninyong i-search sa Product Range, or contact our team para ma-check namin ang availability po."
+                f"Pasensya na po, wala akong nahanap na **{candidate}** sa catalog ng Getmeds. Pwede ninyong i-search sa Product Range, or contact our team para ma-check namin ang availability po."
             }
             answer = not_found_msgs.get(lang, not_found_msgs["en"])
 
