@@ -76,7 +76,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 "Contact Us": "contact-us-list",
                 "Product Inquiry": "product-inquiry-list",
                 "Order Medicine": "order-medicine-list",
-                "Partnership": "partership-list"
+                "Partnership": "partnership-list"
             }
             slug = slug_map.get(request.inquiryType)
             if slug:
@@ -113,13 +113,16 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 row = []
                 inquiry_type = request.inquiryType
                 if inquiry_type == "Career Inquiry":
+                    # Column order matches the sheet's existing header row:
+                    # Full Name, Email, Mobile, Position, Cover Letter, Resume Link, Timestamp
                     row = [
-                        timestamp_str,
                         request.fullName,
                         request.email,
+                        request.phone,
                         request.additionalData.get("position", "") or request.subject,
                         request.message,
-                        ", ".join(file_links)
+                        ", ".join(file_links),
+                        timestamp_str
                     ]
                 elif inquiry_type == "Contact Us":
                     row = [
@@ -132,14 +135,21 @@ async def submit_inquiry(request: InquirySubmitRequest):
                         ", ".join(file_links)
                     ]
                 elif inquiry_type == "Product Inquiry":
+                    # Column order matches the sheet's existing header row:
+                    # Full Name, Phone, Email, Message, Product, Message (dupe — unused, see note below),
+                    # Prescription Link, Timestamp
+                    # The sheet has a duplicate "Message" header (columns D and F) with nothing in the
+                    # form mapping to a second message-like field, so column F is left blank rather than
+                    # guessing — worth fixing the header row directly in the sheet if it's a mistake.
                     row = [
-                        timestamp_str,
-                        request.additionalData.get("productName", ""),
                         request.fullName,
                         request.phone,
                         request.email,
                         request.message,
-                        ", ".join(file_links)
+                        request.additionalData.get("productName", ""),
+                        "",
+                        ", ".join(file_links),
+                        timestamp_str
                     ]
                 elif inquiry_type == "Order Medicine":
                     row = [
@@ -152,14 +162,18 @@ async def submit_inquiry(request: InquirySubmitRequest):
                         ", ".join(file_links)
                     ]
                 elif inquiry_type == "Partnership":
+                    # Column order matches the sheet's existing header row:
+                    # Name, Company/Organization, Email, Mobile Number, Inquiry, Data Privacy Agreement, Timestamp
+                    # The frontend blocks submission unless the consent checkbox is checked and doesn't
+                    # send it as a field, so "Agreed" is always correct here.
                     row = [
-                        timestamp_str,
                         request.fullName,
+                        request.subject or request.additionalData.get("company", ""),
                         request.email,
                         request.phone,
-                        request.subject or request.additionalData.get("subject", ""),
                         request.message,
-                        ", ".join(file_links)
+                        "Agreed",
+                        timestamp_str
                     ]
                 else:
                     row = [
@@ -175,15 +189,15 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 if not values:
                     headers = []
                     if inquiry_type == "Career Inquiry":
-                        headers = ['Timestamp', 'Full Name', 'Email', 'Position', 'Message', 'Attachments']
+                        headers = ['Full Name', 'Email', 'Mobile', 'Position', 'Cover Letter', 'Resume Link', 'Timestamp']
                     elif inquiry_type == "Contact Us":
                         headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Subject', 'Message', 'Attachments']
                     elif inquiry_type == "Product Inquiry":
-                        headers = ['Timestamp', 'Product Name', 'Full Name', 'Phone', 'Email', 'Message', 'Attachments']
+                        headers = ['Full Name', 'Phone', 'Email', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
                     elif inquiry_type == "Order Medicine":
                         headers = ['Timestamp', 'Patient Full Name', 'Email', 'Phone', 'Date of Birth', 'Delivery Address', 'Attachments']
                     elif inquiry_type == "Partnership":
-                        headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Subject', 'Message', 'Attachments']
+                        headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
                     else:
                         headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Message', 'Attachments']
                     
