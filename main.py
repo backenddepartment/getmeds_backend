@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.chatbot import router as chatbot_router
 from app.api.routes.spreadsheet import router as spreadsheet_router
 from app.api.routes.inquiry import router as inquiry_router
+from app.api.routes.sanity import router as sanity_router
 from app.core.config import settings
 
 # ── Skill File Loading ──────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ app.add_middleware(
 app.include_router(chatbot_router, prefix="/api/chatbot", tags=["chatbot"])
 app.include_router(spreadsheet_router, prefix="/api", tags=["spreadsheet"])
 app.include_router(inquiry_router, prefix="/api", tags=["inquiry"])
+app.include_router(sanity_router, prefix="/api", tags=["sanity"])
 
 
 @app.get("/")
