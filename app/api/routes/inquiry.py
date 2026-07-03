@@ -1,6 +1,6 @@
 import base64
 import httpx
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 
@@ -11,6 +11,19 @@ from app.services.email_service import email_service
 from app.api.routes.spreadsheet import clean_spreadsheet_id, get_google_services
 
 router = APIRouter()
+
+# Philippine Standard Time is a fixed UTC+8 offset with no DST (since 1978), so a
+# fixed-offset timezone is correct here and avoids depending on the system/zoneinfo
+# tz database being present (not guaranteed on every host, e.g. some Windows setups).
+MANILA_TZ = timezone(timedelta(hours=8))
+
+def format_manila_timestamp() -> str:
+    """Formats the current Manila time as e.g. "6/10/2026, 12:30:55 PM" (no leading zeros
+    on month/day/hour), matching the display format already used in the inquiry spreadsheets."""
+    now = datetime.now(MANILA_TZ)
+    hour12 = now.hour % 12 or 12
+    ampm = "AM" if now.hour < 12 else "PM"
+    return f"{now.month}/{now.day}/{now.year}, {hour12}:{now.minute:02d}:{now.second:02d} {ampm}"
 
 async def upload_file_to_sanity(file_name: str, file_type: str, file_base64: str) -> Optional[str]:
     """Helper to upload a base64 encoded file to Sanity CMS assets."""
@@ -107,7 +120,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     print(f"WARNING: Could not fetch spreadsheet content: {get_err}")
                     values = []
 
-                timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                timestamp_str = format_manila_timestamp()
 
                 # Setup Row mapping
                 row = []
