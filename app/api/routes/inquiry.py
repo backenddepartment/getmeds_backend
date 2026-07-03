@@ -125,14 +125,20 @@ async def submit_inquiry(request: InquirySubmitRequest):
                         timestamp_str
                     ]
                 elif inquiry_type == "Contact Us":
+                    # Column order matches the sheet's header hierarchy:
+                    # Full Name, Email Address, Phone Number, Subject, Message, Timestamp
+                    # (this form never collects attachments, so there's no attachments column)
+                    # NOTE: as of this change the live sheet's columns still need to be manually
+                    # reordered to match (previously Timestamp was column A) — existing rows must
+                    # have their cells physically moved, not just the header labels, or historical
+                    # data will be mislabeled. See conversation for the exact column mapping.
                     row = [
-                        timestamp_str,
                         request.fullName,
                         request.email,
                         request.phone,
                         request.subject or request.additionalData.get("subject", ""),
                         request.message,
-                        ", ".join(file_links)
+                        timestamp_str
                     ]
                 elif inquiry_type == "Product Inquiry":
                     # Column order matches the sheet's existing header row:
@@ -152,14 +158,21 @@ async def submit_inquiry(request: InquirySubmitRequest):
                         timestamp_str
                     ]
                 elif inquiry_type == "Order Medicine":
+                    # Column order matches the sheet's header hierarchy:
+                    # Full Name, Email Address, Phone Number, Age, Delivery Address,
+                    # Prescription Link, Credentials Confirmation, Timestamp
+                    # The frontend blocks submission unless the "information is authentic"
+                    # checkbox is checked and doesn't send it as a field, so "Confirmed" is
+                    # always correct here (same pattern as Partnership's consent column).
                     row = [
-                        timestamp_str,
                         request.fullName,
                         request.email,
                         request.phone,
-                        request.additionalData.get("dob", ""),
+                        request.additionalData.get("age", ""),
                         request.additionalData.get("address", ""),
-                        ", ".join(file_links)
+                        ", ".join(file_links),
+                        "Confirmed",
+                        timestamp_str
                     ]
                 elif inquiry_type == "Partnership":
                     # Column order matches the sheet's existing header row:
@@ -189,13 +202,13 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 if not values:
                     headers = []
                     if inquiry_type == "Career Inquiry":
-                        headers = ['Full Name', 'Email', 'Mobile', 'Position', 'Cover Letter', 'Resume Link', 'Timestamp']
+                        headers = ['Full Name', 'Email Address', 'Mobile Number', 'Position', 'Cover Letter', 'Resume Link', 'Timestamp']
                     elif inquiry_type == "Contact Us":
-                        headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Subject', 'Message', 'Attachments']
+                        headers = ['Timestamp', 'Full Name', 'Email Address', 'Phone Number', 'Subject', 'Message']
                     elif inquiry_type == "Product Inquiry":
-                        headers = ['Full Name', 'Phone', 'Email', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
+                        headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
                     elif inquiry_type == "Order Medicine":
-                        headers = ['Timestamp', 'Patient Full Name', 'Email', 'Phone', 'Date of Birth', 'Delivery Address', 'Attachments']
+                        headers = ['Full Name', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
                     elif inquiry_type == "Partnership":
                         headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
                     else:
