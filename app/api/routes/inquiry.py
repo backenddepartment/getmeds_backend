@@ -104,6 +104,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
 
         # 3. Store in Designated Google Spreadsheet (if configured)
         sheets_appended = False
+        sheets_error = None
         if spreadsheet_id:
             try:
                 sheets, _ = get_google_services()
@@ -248,6 +249,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 print(f"INFO: Appended inquiry to spreadsheet: {clean_id}")
 
             except Exception as sheet_err:
+                sheets_error = str(sheet_err)
                 print(f"ERROR: Google Spreadsheet appending failed: {sheet_err}")
 
         # 4. Dispatch email to info@getmeds.ph and configured rule recipients
@@ -297,6 +299,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
         return {
             "success": True,
             "sheets_appended": sheets_appended,
+            "sheets_error": sheets_error,
             "email_sent": email_sent,
             "spreadsheet_link": spreadsheet_link,
             "email_recipients": all_emails,
