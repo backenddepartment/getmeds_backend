@@ -4,6 +4,47 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+
+# ── Cancer/oncology routing (frontend split: /cancer-medicines vs /product-range) ──
+# A "category" document is cancer-related if its `category` name is Oncology or
+# Neuro-Oncology (case-insensitive), or if its slug is one of the known cancer
+# subcategory slugs below. Both prefixes render the identical listing page on the
+# frontend; this only picks which URL prefix to embed in search results.
+_CANCER_CATEGORY_NAMES = ("oncology", "neuro-oncology")
+_CANCER_CATEGORY_SLUGS = (
+    "oncology", "breast-cancer", "ovarian-cancer",
+    "non-small-cell-lung-cancer", "lung-cancer", "prostate-cancer",
+    "gastric-cancer-gastric-adenocarcinoma", "pancreatic-cancer",
+    "colorectal-cancer", "hodgkin-non-hodgkins-lymphoma",
+    "hodgkin-non-hodgkin-s-lymphoma", "lymphoma",
+    "acute-lymphoblastic-leukemia", "malignant-pleural-mesothelioma",
+    "head-and-neck-cancer", "chronic-myeloid-leukemia", "cml",
+    "sickle-cell-anemia", "sickle-cell", "malignant-pleural-effusion",
+    "gastrointestinal-stromal-tumors", "acute-myeloid-leukemia", "aml",
+    "acute-lymphocytic-leukemia", "chronic-myelocytic-leukemia",
+    "meningeal-leukemia", "acute-promyelocytic-leukemia",
+    "chronic-lymphocytic-leukemia", "mantle-cell-lymphoma",
+    "multiple-myeloma", "neuro-oncology", "glioblastoma-multiforme",
+)
+
+
+def _category_link_groq(slug_expr: str = "slug.current") -> str:
+    """
+    Builds a GROQ `coalesce()` fragment (two `select()` clauses) that resolves a
+    "category" document's listing link to "/cancer-medicines?category=<slug>" when
+    the category is cancer/oncology-related (by name or slug), else falls back to
+    "/product-range?category=<slug>". Classification happens inside the GROQ query
+    itself since it must run per-document against whatever categories Sanity returns.
+    """
+    names = ", ".join(f'"{n}"' for n in _CANCER_CATEGORY_NAMES)
+    slugs = ", ".join(f'"{s}"' for s in _CANCER_CATEGORY_SLUGS)
+    return (
+        f'select(_type == "category" && (lower(category) in [{names}] '
+        f'|| {slug_expr} in [{slugs}]) => "/cancer-medicines?category=" + {slug_expr}),\n'
+        f'            select(_type == "category" => "/product-range?category=" + {slug_expr})'
+    )
+
+
 class SanityService:
     def __init__(self, project_id: str = None, dataset: str = None):
         pid = project_id or settings.SANITY_PROJECT_ID
@@ -373,7 +414,7 @@ class SanityService:
           "slug": slug.current,
           "link": coalesce(
             select(_type == "product" => "/products/" + slug.current),
-            select(_type == "category" => "/product-range?category=" + slug.current),
+            """ + _category_link_groq() + """,
             select(_type == "teams" => "/team"),
             select(_type == "news" => "/article-detail?id=" + _id),
             "/faq"
@@ -431,7 +472,7 @@ class SanityService:
                   "slug": slug.current,
                   "link": coalesce(
                     select(_type == "product" => "/products/" + slug.current),
-                    select(_type == "category" => "/product-range?category=" + slug.current),
+                    {_category_link_groq()},
                     select(_type == "teams" => "/team"),
                     select(_type == "news" => "/article-detail?id=" + _id),
                     "/faq"

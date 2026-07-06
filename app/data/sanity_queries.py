@@ -35,7 +35,7 @@ SANITY_QUERIES: dict[str, dict] = {
     },
     "product.excelJson": {
         "query": """
-    *[_type == "product" && (remarks == "present" || remarks == "active") && defined(title)][0] {
+    *[_type == "product" && (remarks == "present" || remarks == "active") && defined(title)] | order(_updatedAt desc)[0] {
       json_data
     }
   """

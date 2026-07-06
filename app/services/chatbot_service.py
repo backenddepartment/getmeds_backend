@@ -182,6 +182,47 @@ def product_belongs_to_subcategory(product, subcategory_name):
     ) in prod_sub.lower()
 
 
+# ── Cancer/oncology routing (frontend split: /cancer-medicines vs /product-range) ──
+# A category counts as cancer-related if its Sanity `category` name is Oncology or
+# Neuro-Oncology, or if a subcategory/category slug is one of the known cancer slugs
+# below, or if the specific product's brandName is zoloGet (zoledronic acid — filed
+# under "Orthopedic" in Sanity but clinically used for cancer bone-metastasis).
+_CANCER_CATEGORY_NAMES = {"oncology", "neuro-oncology"}
+_CANCER_CATEGORY_SLUGS = {
+    "oncology", "breast-cancer", "ovarian-cancer",
+    "non-small-cell-lung-cancer", "lung-cancer", "prostate-cancer",
+    "gastric-cancer-gastric-adenocarcinoma", "pancreatic-cancer",
+    "colorectal-cancer", "hodgkin-non-hodgkins-lymphoma",
+    "hodgkin-non-hodgkin-s-lymphoma", "lymphoma",
+    "acute-lymphoblastic-leukemia", "malignant-pleural-mesothelioma",
+    "head-and-neck-cancer", "chronic-myeloid-leukemia", "cml",
+    "sickle-cell-anemia", "sickle-cell", "malignant-pleural-effusion",
+    "gastrointestinal-stromal-tumors", "acute-myeloid-leukemia", "aml",
+    "acute-lymphocytic-leukemia", "chronic-myelocytic-leukemia",
+    "meningeal-leukemia", "acute-promyelocytic-leukemia",
+    "chronic-lymphocytic-leukemia", "mantle-cell-lymphoma",
+    "multiple-myeloma", "neuro-oncology", "glioblastoma-multiforme"
+}
+_CANCER_BRAND_NAMES = {"zoloGet".lower()}
+
+
+def _category_url_prefix(category_name=None, slug=None, brand_name=None):
+    """
+    Returns "cancer-medicines" or "product-range" — the frontend now splits the
+    single /product-range listing page into two URL prefixes depending on whether
+    the category/product is cancer-related. Both prefixes render the identical
+    listing page; this only picks which string to build the link with.
+    Pass whatever of category_name / slug / brand_name is available in scope.
+    """
+    if category_name and category_name.strip().lower() in _CANCER_CATEGORY_NAMES:
+        return "cancer-medicines"
+    if slug and slug.strip().lower() in _CANCER_CATEGORY_SLUGS:
+        return "cancer-medicines"
+    if brand_name and brand_name.strip().lower() in _CANCER_BRAND_NAMES:
+        return "cancer-medicines"
+    return "product-range"
+
+
 # ── AI Responder: Anthropic Claude ──────────────────────────────────
 async def _call_anthropic(system_prompt: str,
                           user_message: str,
@@ -727,7 +768,7 @@ class ChatbotService:
                     "subcategory":
                     matched_category.get("subcategory"),
                     "link":
-                    f"/product-range?category={matched_category.get('slug')}"
+                    f"/{_category_url_prefix(matched_category.get('category'), matched_category.get('slug'))}?category={matched_category.get('slug')}"
                     if matched_category.get("slug") else "/product-range"
                 }
 
@@ -743,7 +784,7 @@ class ChatbotService:
                         "description":
                         f"Browse the {matched_subcategory} subcategory under {matched_category.get('category')}.",
                         "slug": sub_slug,
-                        "link": f"/product-range?category={sub_slug}"
+                        "link": f"/{_category_url_prefix(matched_category.get('category'), sub_slug)}?category={sub_slug}"
                     }
 
                 # Format products
@@ -1253,11 +1294,11 @@ SANITY-ONLY MODE (STRICT):
                 resource_list = [
                     ResourceLink(title=browse_sub_titles.get(
                         lang, browse_sub_titles["en"]),
-                                 url=f"/product-range?category={sub_slug}",
+                                 url=f"/{_category_url_prefix(cat_name, sub_slug)}?category={sub_slug}",
                                  type="category"),
                     ResourceLink(title=browse_cat_titles.get(
                         lang, browse_cat_titles["en"]),
-                                 url=f"/product-range?category={cat_slug}"
+                                 url=f"/{_category_url_prefix(cat_name, cat_slug)}?category={cat_slug}"
                                  if cat_slug else "/product-range",
                                  type="category"),
                     ResourceLink(title=order_med_titles.get(
@@ -1342,7 +1383,7 @@ SANITY-ONLY MODE (STRICT):
                 resource_list = [
                     ResourceLink(title=browse_cat_titles.get(
                         lang, browse_cat_titles["en"]),
-                                 url=f"/product-range?category={cat_slug}"
+                                 url=f"/{_category_url_prefix(cat_name, cat_slug)}?category={cat_slug}"
                                  if cat_slug else "/product-range",
                                  type="category"),
                     ResourceLink(title=order_med_titles.get(
@@ -1714,7 +1755,7 @@ SANITY-ONLY MODE (STRICT):
                                     ResourceLink(
                                         title=inquire_titles.get(
                                             lang, inquire_titles["en"]),
-                                        url=f"/product-range?search={brand}",
+                                        url=f"/{_category_url_prefix(brand_name=brand)}?search={brand}",
                                         type="product"),
                                     ResourceLink(title=order_med_titles.get(
                                         lang, order_med_titles["en"]),
@@ -1853,7 +1894,7 @@ SANITY-ONLY MODE (STRICT):
                 resource_list.append(
                     ResourceLink(title=inquire_titles.get(
                         lang, inquire_titles["en"]),
-                                 url=f"/product-range?search={b}",
+                                 url=f"/{_category_url_prefix(brand_name=b)}?search={b}",
                                  type="product"))
                 if not any(r.url == "/order-medicines" for r in resource_list):
                     resource_list.append(
@@ -1862,8 +1903,9 @@ SANITY-ONLY MODE (STRICT):
                                      url="/order-medicines",
                                      type="page"))
             elif t == "category":
-                link = res.get(
-                    "link") or f"/product-range?category={res.get('slug')}"
+                link = res.get("link") or (
+                    f"/{_category_url_prefix(res.get('title'), res.get('slug'))}"
+                    f"?category={res.get('slug')}")
 
                 browse_cat_titles = {
                     "en": f"Browse {res.get('title')}",
