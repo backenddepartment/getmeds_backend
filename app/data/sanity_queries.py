@@ -224,7 +224,9 @@ SANITY_QUERIES: dict[str, dict] = {
       name,
       images[] {
         image,
-        altText
+        altText,
+        enableLink,
+        link
       }
     }
   """
@@ -236,7 +238,9 @@ SANITY_QUERIES: dict[str, dict] = {
       name,
       images[] {
         image { ..., asset-> },
-        altText
+        altText,
+        enableLink,
+        link
       }
     }
   """
