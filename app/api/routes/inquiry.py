@@ -61,6 +61,8 @@ async def submit_inquiry(request: InquirySubmitRequest):
     try:
         # 1. Upload files to Sanity CMS (if any are present)
         file_links = []
+        id_verification_link = ""
+        prescription_links = []
         if request.files:
             for file in request.files:
                 if not file.name or not file.base64:
@@ -68,6 +70,10 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 url = await upload_file_to_sanity(file.name, file.type, file.base64)
                 if url:
                     file_links.append(url)
+                    if file.category == "id":
+                        id_verification_link = url
+                    else:
+                        prescription_links.append(url)
 
         # 2. Query Sanity for Routing Rules
         recipients = []
@@ -173,18 +179,27 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     ]
                 elif inquiry_type == "Order Medicine":
                     # Column order matches the sheet's header hierarchy:
-                    # Full Name, Email Address, Phone Number, Age, Delivery Address,
+                    # Patient Full Name, Upload Valid ID of the Patient, Contact Person's Full Name,
+                    # Relationship to Patient, Email Address, Phone Number, Age, Delivery Address,
                     # Prescription Link, Credentials Confirmation, Timestamp
-                    # The frontend blocks submission unless the "information is authentic"
-                    # checkbox is checked and doesn't send it as a field, so "Confirmed" is
-                    # always correct here (same pattern as Partnership's consent column).
+                    # When "contact same as patient" is checked, the form hides the contact fields
+                    # entirely, so fall back to the patient's own name / "Self" instead of blanks.
+                    # The frontend blocks submission unless the "information is authentic" checkbox
+                    # is checked and doesn't send it as a field, so "Confirmed" is always correct here
+                    # (same pattern as Partnership's consent column).
+                    same_as_patient = request.additionalData.get("contactSameAsPatient", False)
+                    contact_name = request.fullName if same_as_patient else request.additionalData.get("contactName", "")
+                    contact_relationship = "Self" if same_as_patient else request.additionalData.get("contactRelationship", "")
                     row = [
                         request.fullName,
+                        id_verification_link,
+                        contact_name,
+                        contact_relationship,
                         request.email,
                         request.phone,
                         request.additionalData.get("age", ""),
                         request.additionalData.get("address", ""),
-                        ", ".join(file_links),
+                        ", ".join(prescription_links),
                         "Confirmed",
                         timestamp_str
                     ]
@@ -222,7 +237,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     elif inquiry_type == "Product Inquiry":
                         headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
                     elif inquiry_type == "Order Medicine":
-                        headers = ['Full Name', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
+                        headers = ['Patient Full Name', 'Upload Valid ID of the Patient', "Contact Person's Full Name", 'Relationship to Patient', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
                     elif inquiry_type == "Partnership":
                         headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
                     else:
