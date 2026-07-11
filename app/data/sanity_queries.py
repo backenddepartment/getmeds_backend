@@ -104,16 +104,13 @@ SANITY_QUERIES: dict[str, dict] = {
     *[_type == "service"] | order(_createdAt asc)
   """
     },
-    "teamMember.all": {
+    "teams.all": {
         "query": """
-    *[_type == "teamMember"] {
+    *[_type == "teams"] | order(orderRank asc) {
       _id,
       name,
-      role,
-      image,
-      ribbonLabel,
-      bio,
-      socialLinks,
+      designation,
+      image
     }
   """
     },
@@ -227,7 +224,9 @@ SANITY_QUERIES: dict[str, dict] = {
       name,
       images[] {
         image,
-        altText
+        altText,
+        enableLink,
+        link
       }
     }
   """
@@ -239,7 +238,9 @@ SANITY_QUERIES: dict[str, dict] = {
       name,
       images[] {
         image { ..., asset-> },
-        altText
+        altText,
+        enableLink,
+        link
       }
     }
   """
