@@ -25,6 +25,7 @@ from app.api.routes.chatbot import router as chatbot_router
 from app.api.routes.spreadsheet import router as spreadsheet_router
 from app.api.routes.inquiry import router as inquiry_router
 from app.api.routes.sanity import router as sanity_router
+from app.api.routes.slug_resolver import router as slug_resolver_router
 from app.core.config import settings
 
 # ── Skill File Loading ──────────────────────────────────────────────────────
@@ -75,6 +76,7 @@ app.include_router(chatbot_router, prefix="/api/chatbot", tags=["chatbot"])
 app.include_router(spreadsheet_router, prefix="/api", tags=["spreadsheet"])
 app.include_router(inquiry_router, prefix="/api", tags=["inquiry"])
 app.include_router(sanity_router, prefix="/api", tags=["sanity"])
+app.include_router(slug_resolver_router, prefix="/api", tags=["slug_resolver"])
 
 
 @app.get("/")
