@@ -1,7 +1,7 @@
 import base64
 import httpx
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.inquiry import InquirySubmitRequest
@@ -24,6 +24,127 @@ def format_manila_timestamp() -> str:
     hour12 = now.hour % 12 or 12
     ampm = "AM" if now.hour < 12 else "PM"
     return f"{now.month}/{now.day}/{now.year}, {hour12}:{now.minute:02d}:{now.second:02d} {ampm}"
+
+def map_row_to_headers(headers: List[str], field_values: Dict[str, str]) -> List[str]:
+    """
+    Builds a spreadsheet row by matching each column's header text (trimmed,
+    case-insensitive) against field_values keys, so the live sheet's header row
+    is authoritative for column layout — reordering, renaming, or inserting a
+    header there no longer requires a matching code change here. A header text
+    that repeats (e.g. a sheet with two "Message" columns) only consumes the
+    matching field once; later duplicates are left blank rather than repeating
+    the same value into every column that shares that label.
+    """
+    used_keys = set()
+    row = []
+    for header in headers:
+        normalized = (header or "").strip().lower()
+        matched_key = None
+        for key in field_values:
+            if key not in used_keys and key.strip().lower() == normalized:
+                matched_key = key
+                break
+        if matched_key is not None:
+            row.append(str(field_values[matched_key]))
+            used_keys.add(matched_key)
+        else:
+            row.append("")
+    return row
+
+def build_field_values(
+    inquiry_type: str,
+    request: InquirySubmitRequest,
+    file_links_by_category: Dict[str, List[str]],
+    timestamp_str: str,
+):
+    """
+    Returns (default_headers, field_values) for an inquiry type: default_headers
+    is only used to seed a brand-new/empty spreadsheet, while field_values is the
+    header-name -> value mapping that map_row_to_headers() matches against
+    whatever header row the live sheet actually has.
+    """
+    def links(*categories: str) -> str:
+        combined: List[str] = []
+        for category in categories:
+            combined.extend(file_links_by_category.get(category, []))
+        return ", ".join(combined)
+
+    if inquiry_type == "Career Inquiry":
+        headers = ['Full Name', 'Email Address', 'Mobile Number', 'Position', 'Cover Letter', 'Resume Link', 'Timestamp']
+        field_values = {
+            'Full Name': request.fullName,
+            'Email Address': request.email,
+            'Mobile Number': request.phone,
+            'Position': request.additionalData.get("position", "") or request.subject,
+            'Cover Letter': request.message,
+            'Resume Link': links('resume', 'file'),
+            'Timestamp': timestamp_str,
+        }
+    elif inquiry_type == "Contact Us":
+        headers = ['Timestamp', 'Full Name', 'Email Address', 'Phone Number', 'Subject', 'Message']
+        field_values = {
+            'Timestamp': timestamp_str,
+            'Full Name': request.fullName,
+            'Email Address': request.email,
+            'Phone Number': request.phone,
+            'Subject': request.subject or request.additionalData.get("subject", ""),
+            'Message': request.message,
+        }
+    elif inquiry_type == "Product Inquiry":
+        # The live sheet has a duplicate "Message" header (columns D and F) with
+        # nothing mapping to a second message-like field; map_row_to_headers()
+        # leaves the second occurrence blank rather than repeating the value.
+        headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
+        field_values = {
+            'Full Name': request.fullName,
+            'Phone Number': request.phone,
+            'Email Address': request.email,
+            'Message': request.message,
+            'Product': request.additionalData.get("productName", ""),
+            'Prescription Link': links('prescription', 'file'),
+            'Timestamp': timestamp_str,
+        }
+    elif inquiry_type == "Order Medicine":
+        # The frontend blocks submission unless the "information is authentic"
+        # checkbox is checked and doesn't send it as a field, so "Confirmed" is
+        # always correct here (same pattern as Partnership's consent column).
+        headers = ['Full Name', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Valid ID Link', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
+        field_values = {
+            'Full Name': request.fullName,
+            'Email Address': request.email,
+            'Phone Number': request.phone,
+            'Age': request.additionalData.get("age", ""),
+            'Delivery Address': request.additionalData.get("address", ""),
+            'Valid ID Link': links('id'),
+            'Prescription Link': links('prescription', 'file'),
+            'Credentials Confirmation': "Confirmed",
+            'Timestamp': timestamp_str,
+        }
+    elif inquiry_type == "Partnership":
+        # The frontend blocks submission unless the consent checkbox is checked
+        # and doesn't send it as a field, so "Agreed" is always correct here.
+        headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
+        field_values = {
+            'Name': request.fullName,
+            'Company/Organization': request.subject or request.additionalData.get("company", ""),
+            'Email': request.email,
+            'Mobile Number': request.phone,
+            'Inquiry': request.message,
+            'Data Privacy Agreement': "Agreed",
+            'Timestamp': timestamp_str,
+        }
+    else:
+        headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Message', 'Attachments']
+        field_values = {
+            'Timestamp': timestamp_str,
+            'Full Name': request.fullName,
+            'Email': request.email,
+            'Phone': request.phone,
+            'Message': request.message,
+            'Attachments': links('id', 'prescription', 'resume', 'file'),
+        }
+
+    return headers, field_values
 
 async def upload_file_to_sanity(file_name: str, file_type: str, file_base64: str) -> Optional[str]:
     """Helper to upload a base64 encoded file to Sanity CMS assets."""
@@ -59,8 +180,11 @@ async def submit_inquiry(request: InquirySubmitRequest):
     4. Emails info@getmeds.ph and other configured recipients.
     """
     try:
-        # 1. Upload files to Sanity CMS (if any are present)
+        # 1. Upload files to Sanity CMS (if any are present), grouping the resulting
+        # links by category (e.g. "id" vs "prescription") so each can be routed to
+        # its own spreadsheet column instead of merging every upload into one link.
         file_links = []
+        file_links_by_category: Dict[str, List[str]] = {}
         if request.files:
             for file in request.files:
                 if not file.name or not file.base64:
@@ -68,6 +192,8 @@ async def submit_inquiry(request: InquirySubmitRequest):
                 url = await upload_file_to_sanity(file.name, file.type, file.base64)
                 if url:
                     file_links.append(url)
+                    category = (file.category or "file").strip().lower() or "file"
+                    file_links_by_category.setdefault(category, []).append(url)
 
         # 2. Query Sanity for Routing Rules
         recipients = []
@@ -122,121 +248,31 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     values = []
 
                 timestamp_str = format_manila_timestamp()
-
-                # Setup Row mapping
-                row = []
                 inquiry_type = request.inquiryType
-                if inquiry_type == "Career Inquiry":
-                    # Column order matches the sheet's existing header row:
-                    # Full Name, Email, Mobile, Position, Cover Letter, Resume Link, Timestamp
-                    row = [
-                        request.fullName,
-                        request.email,
-                        request.phone,
-                        request.additionalData.get("position", "") or request.subject,
-                        request.message,
-                        ", ".join(file_links),
-                        timestamp_str
-                    ]
-                elif inquiry_type == "Contact Us":
-                    # Column order matches the sheet's header hierarchy:
-                    # Full Name, Email Address, Phone Number, Subject, Message, Timestamp
-                    # (this form never collects attachments, so there's no attachments column)
-                    # NOTE: as of this change the live sheet's columns still need to be manually
-                    # reordered to match (previously Timestamp was column A) — existing rows must
-                    # have their cells physically moved, not just the header labels, or historical
-                    # data will be mislabeled. See conversation for the exact column mapping.
-                    row = [
-                        request.fullName,
-                        request.email,
-                        request.phone,
-                        request.subject or request.additionalData.get("subject", ""),
-                        request.message,
-                        timestamp_str
-                    ]
-                elif inquiry_type == "Product Inquiry":
-                    # Column order matches the sheet's existing header row:
-                    # Full Name, Phone, Email, Message, Product, Message (dupe — unused, see note below),
-                    # Prescription Link, Timestamp
-                    # The sheet has a duplicate "Message" header (columns D and F) with nothing in the
-                    # form mapping to a second message-like field, so column F is left blank rather than
-                    # guessing — worth fixing the header row directly in the sheet if it's a mistake.
-                    row = [
-                        request.fullName,
-                        request.phone,
-                        request.email,
-                        request.message,
-                        request.additionalData.get("productName", ""),
-                        "",
-                        ", ".join(file_links),
-                        timestamp_str
-                    ]
-                elif inquiry_type == "Order Medicine":
-                    # Column order matches the sheet's header hierarchy:
-                    # Full Name, Email Address, Phone Number, Age, Delivery Address,
-                    # Prescription Link, Credentials Confirmation, Timestamp
-                    # The frontend blocks submission unless the "information is authentic"
-                    # checkbox is checked and doesn't send it as a field, so "Confirmed" is
-                    # always correct here (same pattern as Partnership's consent column).
-                    row = [
-                        request.fullName,
-                        request.email,
-                        request.phone,
-                        request.additionalData.get("age", ""),
-                        request.additionalData.get("address", ""),
-                        ", ".join(file_links),
-                        "Confirmed",
-                        timestamp_str
-                    ]
-                elif inquiry_type == "Partnership":
-                    # Column order matches the sheet's existing header row:
-                    # Name, Company/Organization, Email, Mobile Number, Inquiry, Data Privacy Agreement, Timestamp
-                    # The frontend blocks submission unless the consent checkbox is checked and doesn't
-                    # send it as a field, so "Agreed" is always correct here.
-                    row = [
-                        request.fullName,
-                        request.subject or request.additionalData.get("company", ""),
-                        request.email,
-                        request.phone,
-                        request.message,
-                        "Agreed",
-                        timestamp_str
-                    ]
-                else:
-                    row = [
-                        timestamp_str,
-                        request.fullName,
-                        request.email,
-                        request.phone,
-                        request.message,
-                        ", ".join(file_links)
-                    ]
+
+                # Build header-name -> value mapping for this inquiry type, then match
+                # it against the sheet's own header row (read first) rather than
+                # assuming a fixed column order — see map_row_to_headers/build_field_values.
+                default_headers, field_values = build_field_values(
+                    inquiry_type, request, file_links_by_category, timestamp_str
+                )
 
                 # Update Headers if the Spreadsheet is Empty
                 if not values:
-                    headers = []
-                    if inquiry_type == "Career Inquiry":
-                        headers = ['Full Name', 'Email Address', 'Mobile Number', 'Position', 'Cover Letter', 'Resume Link', 'Timestamp']
-                    elif inquiry_type == "Contact Us":
-                        headers = ['Timestamp', 'Full Name', 'Email Address', 'Phone Number', 'Subject', 'Message']
-                    elif inquiry_type == "Product Inquiry":
-                        headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
-                    elif inquiry_type == "Order Medicine":
-                        headers = ['Full Name', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
-                    elif inquiry_type == "Partnership":
-                        headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
-                    else:
-                        headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Message', 'Attachments']
-                    
                     try:
                         sheets.spreadsheets().values().update(
                             spreadsheetId=clean_id,
                             range='Sheet1!A1',
                             valueInputOption='RAW',
-                            body={'values': [headers]}
+                            body={'values': [default_headers]}
                         ).execute()
                     except Exception as update_err:
                         print(f"ERROR: Failed to update headers: {update_err}")
+                    sheet_headers = default_headers
+                else:
+                    sheet_headers = values[0]
+
+                row = map_row_to_headers(sheet_headers, field_values)
 
                 # Append Row
                 sheets.spreadsheets().values().append(
