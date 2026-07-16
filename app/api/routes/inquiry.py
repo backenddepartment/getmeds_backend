@@ -1,5 +1,6 @@
 import base64
 import httpx
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException
@@ -25,43 +26,30 @@ def format_manila_timestamp() -> str:
     ampm = "AM" if now.hour < 12 else "PM"
     return f"{now.month}/{now.day}/{now.year}, {hour12}:{now.minute:02d}:{now.second:02d} {ampm}"
 
-def map_row_to_headers(headers: List[str], field_values: Dict[str, str]) -> List[str]:
-    """
-    Builds a spreadsheet row by matching each column's header text (trimmed,
-    case-insensitive) against field_values keys, so the live sheet's header row
-    is authoritative for column layout — reordering, renaming, or inserting a
-    header there no longer requires a matching code change here. A header text
-    that repeats (e.g. a sheet with two "Message" columns) only consumes the
-    matching field once; later duplicates are left blank rather than repeating
-    the same value into every column that shares that label.
-    """
-    used_keys = set()
-    row = []
-    for header in headers:
-        normalized = (header or "").strip().lower()
-        matched_key = None
-        for key in field_values:
-            if key not in used_keys and key.strip().lower() == normalized:
-                matched_key = key
-                break
-        if matched_key is not None:
-            row.append(str(field_values[matched_key]))
-            used_keys.add(matched_key)
-        else:
-            row.append("")
-    return row
+def normalize_header(header: str) -> str:
+    """Lowercases and strips everything but letters/digits, so 'FULLNAME',
+    'Full Name', and 'full_name' all normalize to the same 'fullname' — live
+    sheets are hand-edited and drift in spacing/casing/punctuation shouldn't
+    break the mapping. Matches the same normalization pattern used by
+    getmeds_database's studio/lib/excelImport.ts."""
+    return re.sub(r"[^a-z0-9]+", "", (header or "").lower())
 
-def build_field_values(
-    inquiry_type: str,
-    request: InquirySubmitRequest,
-    file_links_by_category: Dict[str, List[str]],
-    timestamp_str: str,
-):
+# Used only to seed a brand-new/empty spreadsheet that has no admin-parsed headers yet
+# (see the "headers" field on the googleSpreadsheet Sanity document). Once an admin
+# pastes/re-generates the spreadsheet link in Studio, the parsed live header row takes
+# over as the authoritative column layout — see resolve_field_value/build_row_from_headers.
+FALLBACK_HEADERS = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Message', 'Attachments']
+
+def resolve_field_value(normalized_header: str, request: InquirySubmitRequest,
+                         file_links_by_category: Dict[str, List[str]], timestamp_str: str) -> str:
     """
-    Returns (default_headers, field_values) for an inquiry type: default_headers
-    is only used to seed a brand-new/empty spreadsheet, while field_values is the
-    header-name -> value mapping that map_row_to_headers() matches against
-    whatever header row the live sheet actually has.
+    Maps a single normalized header (see normalize_header) to the value it should
+    hold for this submission, purely by what the header text means — independent
+    of inquiryType. This is what lets a brand-new column an admin adds to a live
+    sheet (e.g. "Valid ID Uploaded of Patient") get filled automatically as long
+    as its wording matches one of the rules below, with no backend redeploy.
+    Checks are ordered most-specific first so e.g. "Email Address" (contains
+    "email") is claimed before a generic "address" rule could see it.
     """
     def links(*categories: str) -> str:
         combined: List[str] = []
@@ -69,82 +57,71 @@ def build_field_values(
             combined.extend(file_links_by_category.get(category, []))
         return ", ".join(combined)
 
-    if inquiry_type == "Career Inquiry":
-        headers = ['Full Name', 'Email Address', 'Mobile Number', 'Position', 'Cover Letter', 'Resume Link', 'Timestamp']
-        field_values = {
-            'Full Name': request.fullName,
-            'Email Address': request.email,
-            'Mobile Number': request.phone,
-            'Position': request.additionalData.get("position", "") or request.subject,
-            'Cover Letter': request.message,
-            'Resume Link': links('resume', 'file'),
-            'Timestamp': timestamp_str,
-        }
-    elif inquiry_type == "Contact Us":
-        headers = ['Timestamp', 'Full Name', 'Email Address', 'Phone Number', 'Subject', 'Message']
-        field_values = {
-            'Timestamp': timestamp_str,
-            'Full Name': request.fullName,
-            'Email Address': request.email,
-            'Phone Number': request.phone,
-            'Subject': request.subject or request.additionalData.get("subject", ""),
-            'Message': request.message,
-        }
-    elif inquiry_type == "Product Inquiry":
-        # The live sheet has a duplicate "Message" header (columns D and F) with
-        # nothing mapping to a second message-like field; map_row_to_headers()
-        # leaves the second occurrence blank rather than repeating the value.
-        headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
-        field_values = {
-            'Full Name': request.fullName,
-            'Phone Number': request.phone,
-            'Email Address': request.email,
-            'Message': request.message,
-            'Product': request.additionalData.get("productName", ""),
-            'Prescription Link': links('prescription', 'file'),
-            'Timestamp': timestamp_str,
-        }
-    elif inquiry_type == "Order Medicine":
-        # The frontend blocks submission unless the "information is authentic"
-        # checkbox is checked and doesn't send it as a field, so "Confirmed" is
-        # always correct here (same pattern as Partnership's consent column).
-        headers = ['Full Name', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Valid ID Link', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
-        field_values = {
-            'Full Name': request.fullName,
-            'Email Address': request.email,
-            'Phone Number': request.phone,
-            'Age': request.additionalData.get("age", ""),
-            'Delivery Address': request.additionalData.get("address", ""),
-            'Valid ID Link': links('id'),
-            'Prescription Link': links('prescription', 'file'),
-            'Credentials Confirmation': "Confirmed",
-            'Timestamp': timestamp_str,
-        }
-    elif inquiry_type == "Partnership":
-        # The frontend blocks submission unless the consent checkbox is checked
-        # and doesn't send it as a field, so "Agreed" is always correct here.
-        headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
-        field_values = {
-            'Name': request.fullName,
-            'Company/Organization': request.subject or request.additionalData.get("company", ""),
-            'Email': request.email,
-            'Mobile Number': request.phone,
-            'Inquiry': request.message,
-            'Data Privacy Agreement': "Agreed",
-            'Timestamp': timestamp_str,
-        }
-    else:
-        headers = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Message', 'Attachments']
-        field_values = {
-            'Timestamp': timestamp_str,
-            'Full Name': request.fullName,
-            'Email': request.email,
-            'Phone': request.phone,
-            'Message': request.message,
-            'Attachments': links('id', 'prescription', 'resume', 'file'),
-        }
+    h = normalized_header
+    contact_same_as_patient = bool(request.additionalData.get("contactSameAsPatient"))
 
-    return headers, field_values
+    if "validid" in h:
+        return links("id")
+    if "relationship" in h:
+        return "Self" if contact_same_as_patient else request.additionalData.get("contactRelationship", "")
+    if "contactperson" in h or ("contact" in h and "fullname" in h):
+        return request.fullName if contact_same_as_patient else request.additionalData.get("contactName", "")
+    if "resume" in h:
+        return links("resume", "file")
+    if "prescription" in h:
+        return links("prescription", "file")
+    if "coverletter" in h:
+        return request.message
+    if "credential" in h:
+        return "Confirmed"
+    if "privacy" in h or "agreement" in h:
+        return "Agreed"
+    if h in ("timestamp", "date", "datetime"):
+        return timestamp_str
+    if "company" in h or "organization" in h:
+        return request.subject or request.additionalData.get("company", "")
+    if "position" in h:
+        return request.additionalData.get("position", "") or request.subject
+    if "product" in h:
+        return request.additionalData.get("productName", "")
+    if "email" in h:
+        return request.email
+    if "deliveryaddress" in h or h == "address":
+        return request.additionalData.get("address", "")
+    if h == "age":
+        return request.additionalData.get("age", "")
+    if "phone" in h or "mobile" in h:
+        return request.phone
+    if "message" in h or "inquiry" in h:
+        return request.message
+    if "fullname" in h or h == "name":
+        return request.fullName
+    if "subject" in h:
+        return request.subject or ""
+    if "attachment" in h or "link" in h or "file" in h:
+        return links("id", "prescription", "resume", "file")
+    return ""
+
+def build_row_from_headers(headers: List[str], request: InquirySubmitRequest,
+                            file_links_by_category: Dict[str, List[str]], timestamp_str: str) -> List[str]:
+    """
+    Builds a spreadsheet row by resolving a value for each column's header text
+    (see resolve_field_value). A header that repeats after normalization (e.g. a
+    sheet with two "Message" columns) only gets filled once; later duplicates are
+    left blank rather than repeating the same value into every column that shares
+    that label. Any column whose header doesn't match a known field (e.g. a
+    staff-managed "Status"/"RR" tracking column) is also left blank, not guessed.
+    """
+    used = set()
+    row = []
+    for header in headers:
+        normalized = normalize_header(header)
+        if normalized and normalized not in used:
+            row.append(resolve_field_value(normalized, request, file_links_by_category, timestamp_str))
+            used.add(normalized)
+        else:
+            row.append("")
+    return row
 
 async def upload_file_to_sanity(file_name: str, file_type: str, file_base64: str) -> Optional[str]:
     """Helper to upload a base64 encoded file to Sanity CMS assets."""
@@ -195,16 +172,21 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     category = (file.category or "file").strip().lower() or "file"
                     file_links_by_category.setdefault(category, []).append(url)
 
-        # 2. Query Sanity for Routing Rules
+        # 2. Query Sanity for Routing Rules — also pull the admin-parsed "headers" field
+        # off the linked googleSpreadsheet doc (populated in Studio when an admin pastes/
+        # re-generates the spreadsheet link — see SpreadsheetLinkInput.tsx), which is what
+        # determines the column layout below rather than a hardcoded per-type list.
         recipients = []
         spreadsheet_id = None
-        
+        sanity_headers: List[str] = []
+
         try:
-            groq_query = '*[_type == "inquiryRouting" && inquiryType == $inquiryType][0]{ recipients, "spreadsheetId": spreadsheet->spreadsheetId }'
+            groq_query = '*[_type == "inquiryRouting" && inquiryType == $inquiryType][0]{ recipients, "spreadsheetId": spreadsheet->spreadsheetId, "headers": spreadsheet->headers }'
             routing_rule = await sanity_service.query_sanity(groq_query, {"$inquiryType": request.inquiryType})
             if routing_rule:
                 recipients = routing_rule.get("recipients") or []
                 spreadsheet_id = routing_rule.get("spreadsheetId")
+                sanity_headers = routing_rule.get("headers") or []
         except Exception as query_err:
             print(f"WARNING: Failed to query Sanity for inquiry routing rule: {query_err}")
 
@@ -220,10 +202,11 @@ async def submit_inquiry(request: InquirySubmitRequest):
             slug = slug_map.get(request.inquiryType)
             if slug:
                 try:
-                    sheet_query = '*[_type == "googleSpreadsheet" && id.current == $slug][0]{ spreadsheetId }'
+                    sheet_query = '*[_type == "googleSpreadsheet" && id.current == $slug][0]{ spreadsheetId, headers }'
                     sheet_doc = await sanity_service.query_sanity(sheet_query, {"$slug": slug})
                     if sheet_doc:
                         spreadsheet_id = sheet_doc.get("spreadsheetId")
+                        sanity_headers = sheet_doc.get("headers") or []
                         print(f"INFO: Resolved fallback spreadsheet for '{request.inquiryType}' matching slug '{slug}': {spreadsheet_id}")
                 except Exception as fallback_err:
                     print(f"WARNING: Failed to query fallback googleSpreadsheet by slug: {fallback_err}")
@@ -248,31 +231,33 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     values = []
 
                 timestamp_str = format_manila_timestamp()
-                inquiry_type = request.inquiryType
 
-                # Build header-name -> value mapping for this inquiry type, then match
-                # it against the sheet's own header row (read first) rather than
-                # assuming a fixed column order — see map_row_to_headers/build_field_values.
-                default_headers, field_values = build_field_values(
-                    inquiry_type, request, file_links_by_category, timestamp_str
-                )
+                # Column layout comes from wherever an authoritative header row is
+                # available, in priority order: (1) the admin-parsed "headers" field on
+                # the linked googleSpreadsheet Sanity doc — generated when an admin
+                # pastes/re-generates the link in Studio; (2) the live sheet's own row 1,
+                # if the admin hasn't (re-)parsed yet but the sheet already has content;
+                # (3) a minimal fallback used only to seed a brand-new, never-parsed,
+                # empty spreadsheet.
+                if sanity_headers:
+                    sheet_headers = sanity_headers
+                elif values:
+                    sheet_headers = values[0]
+                else:
+                    sheet_headers = FALLBACK_HEADERS
 
-                # Update Headers if the Spreadsheet is Empty
                 if not values:
                     try:
                         sheets.spreadsheets().values().update(
                             spreadsheetId=clean_id,
                             range='Sheet1!A1',
                             valueInputOption='RAW',
-                            body={'values': [default_headers]}
+                            body={'values': [sheet_headers]}
                         ).execute()
                     except Exception as update_err:
                         print(f"ERROR: Failed to update headers: {update_err}")
-                    sheet_headers = default_headers
-                else:
-                    sheet_headers = values[0]
 
-                row = map_row_to_headers(sheet_headers, field_values)
+                row = build_row_from_headers(sheet_headers, request, file_links_by_category, timestamp_str)
 
                 # Append Row
                 sheets.spreadsheets().values().append(
