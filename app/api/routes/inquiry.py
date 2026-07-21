@@ -181,15 +181,17 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     # Column order matches the sheet's header hierarchy:
                     # Patient Full Name, Upload Valid ID of the Patient, Contact Person's Full Name,
                     # Relationship to Patient, Email Address, Phone Number, Age, Delivery Address,
-                    # Prescription Link, Credentials Confirmation, Timestamp
+                    # Prescription Link, Credentials Confirmation, Privacy Policy Consent, Timestamp
                     # When "contact same as patient" is checked, the form hides the contact fields
                     # entirely, so fall back to the patient's own name / "Self" instead of blanks.
                     # The frontend blocks submission unless the "information is authentic" checkbox
                     # is checked and doesn't send it as a field, so "Confirmed" is always correct here
-                    # (same pattern as Partnership's consent column).
+                    # (same pattern as Partnership's consent column). Privacy Policy Consent is a
+                    # separate real checkbox the frontend does send, so its value is read as-is.
                     same_as_patient = request.additionalData.get("contactSameAsPatient", False)
                     contact_name = request.fullName if same_as_patient else request.additionalData.get("contactName", "")
                     contact_relationship = "Self" if same_as_patient else request.additionalData.get("contactRelationship", "")
+                    privacy_policy_consent = "Yes" if request.additionalData.get("privacyPolicyConsent", False) else "No"
                     row = [
                         request.fullName,
                         id_verification_link,
@@ -201,6 +203,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                         request.additionalData.get("address", ""),
                         ", ".join(prescription_links),
                         "Confirmed",
+                        privacy_policy_consent,
                         timestamp_str
                     ]
                 elif inquiry_type == "Partnership":
@@ -237,7 +240,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     elif inquiry_type == "Product Inquiry":
                         headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
                     elif inquiry_type == "Order Medicine":
-                        headers = ['Patient Full Name', 'Upload Valid ID of the Patient', "Contact Person's Full Name", 'Relationship to Patient', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
+                        headers = ['Patient Full Name', 'Upload Valid ID of the Patient', "Contact Person's Full Name", 'Relationship to Patient', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Privacy Policy Consent', 'Timestamp']
                     elif inquiry_type == "Partnership":
                         headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
                     else:
