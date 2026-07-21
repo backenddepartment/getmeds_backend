@@ -1,7 +1,8 @@
 import base64
 import httpx
+import re
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.inquiry import InquirySubmitRequest
@@ -24,6 +25,103 @@ def format_manila_timestamp() -> str:
     hour12 = now.hour % 12 or 12
     ampm = "AM" if now.hour < 12 else "PM"
     return f"{now.month}/{now.day}/{now.year}, {hour12}:{now.minute:02d}:{now.second:02d} {ampm}"
+
+def normalize_header(header: str) -> str:
+    """Lowercases and strips everything but letters/digits, so 'FULLNAME',
+    'Full Name', and 'full_name' all normalize to the same 'fullname' — live
+    sheets are hand-edited and drift in spacing/casing/punctuation shouldn't
+    break the mapping. Matches the same normalization pattern used by
+    getmeds_database's studio/lib/excelImport.ts."""
+    return re.sub(r"[^a-z0-9]+", "", (header or "").lower())
+
+# Used only to seed a brand-new/empty spreadsheet that has no admin-parsed headers yet
+# (see the "headers" field on the googleSpreadsheet Sanity document). Once an admin
+# pastes/re-generates the spreadsheet link in Studio, the parsed live header row takes
+# over as the authoritative column layout — see resolve_field_value/build_row_from_headers.
+FALLBACK_HEADERS = ['Timestamp', 'Full Name', 'Email', 'Phone', 'Message', 'Attachments']
+
+def resolve_field_value(normalized_header: str, request: InquirySubmitRequest,
+                         file_links_by_category: Dict[str, List[str]], timestamp_str: str) -> str:
+    """
+    Maps a single normalized header (see normalize_header) to the value it should
+    hold for this submission, purely by what the header text means — independent
+    of inquiryType. This is what lets a brand-new column an admin adds to a live
+    sheet (e.g. "Valid ID Uploaded of Patient") get filled automatically as long
+    as its wording matches one of the rules below, with no backend redeploy.
+    Checks are ordered most-specific first so e.g. "Email Address" (contains
+    "email") is claimed before a generic "address" rule could see it.
+    """
+    def links(*categories: str) -> str:
+        combined: List[str] = []
+        for category in categories:
+            combined.extend(file_links_by_category.get(category, []))
+        return ", ".join(combined)
+
+    h = normalized_header
+    contact_same_as_patient = bool(request.additionalData.get("contactSameAsPatient"))
+
+    if "validid" in h:
+        return links("id")
+    if "relationship" in h:
+        return "Self" if contact_same_as_patient else request.additionalData.get("contactRelationship", "")
+    if "contactperson" in h or ("contact" in h and "fullname" in h):
+        return request.fullName if contact_same_as_patient else request.additionalData.get("contactName", "")
+    if "resume" in h:
+        return links("resume", "file")
+    if "prescription" in h:
+        return links("prescription", "file")
+    if "coverletter" in h:
+        return request.message
+    if "credential" in h:
+        return "Confirmed"
+    if "privacy" in h or "agreement" in h:
+        return "Agreed"
+    if h in ("timestamp", "date", "datetime"):
+        return timestamp_str
+    if "company" in h or "organization" in h:
+        return request.subject or request.additionalData.get("company", "")
+    if "position" in h:
+        return request.additionalData.get("position", "") or request.subject
+    if "product" in h:
+        return request.additionalData.get("productName", "")
+    if "email" in h:
+        return request.email
+    if "deliveryaddress" in h or h == "address":
+        return request.additionalData.get("address", "")
+    if h == "age":
+        return request.additionalData.get("age", "")
+    if "phone" in h or "mobile" in h:
+        return request.phone
+    if "message" in h or "inquiry" in h:
+        return request.message
+    if "fullname" in h or h == "name":
+        return request.fullName
+    if "subject" in h:
+        return request.subject or ""
+    if "attachment" in h or "link" in h or "file" in h:
+        return links("id", "prescription", "resume", "file")
+    return ""
+
+def build_row_from_headers(headers: List[str], request: InquirySubmitRequest,
+                            file_links_by_category: Dict[str, List[str]], timestamp_str: str) -> List[str]:
+    """
+    Builds a spreadsheet row by resolving a value for each column's header text
+    (see resolve_field_value). A header that repeats after normalization (e.g. a
+    sheet with two "Message" columns) only gets filled once; later duplicates are
+    left blank rather than repeating the same value into every column that shares
+    that label. Any column whose header doesn't match a known field (e.g. a
+    staff-managed "Status"/"RR" tracking column) is also left blank, not guessed.
+    """
+    used = set()
+    row = []
+    for header in headers:
+        normalized = normalize_header(header)
+        if normalized and normalized not in used:
+            row.append(resolve_field_value(normalized, request, file_links_by_category, timestamp_str))
+            used.add(normalized)
+        else:
+            row.append("")
+    return row
 
 async def upload_file_to_sanity(file_name: str, file_type: str, file_base64: str) -> Optional[str]:
     """Helper to upload a base64 encoded file to Sanity CMS assets."""
@@ -59,10 +157,10 @@ async def submit_inquiry(request: InquirySubmitRequest):
     4. Emails info@getmeds.ph and other configured recipients.
     """
     try:
-        # 1. Upload files to Sanity CMS (if any are present)
+        # 1. Upload files to Sanity CMS (if any are present), grouping the resulting
+        # links by category (e.g. "id" vs "prescription") so each can be routed to
+        # its own spreadsheet column instead of merging every upload into one link.
         file_links = []
-        id_verification_link = ""
-        prescription_links = []
         if request.files:
             for file in request.files:
                 if not file.name or not file.base64:
@@ -75,16 +173,21 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     else:
                         prescription_links.append(url)
 
-        # 2. Query Sanity for Routing Rules
+        # 2. Query Sanity for Routing Rules — also pull the admin-parsed "headers" field
+        # off the linked googleSpreadsheet doc (populated in Studio when an admin pastes/
+        # re-generates the spreadsheet link — see SpreadsheetLinkInput.tsx), which is what
+        # determines the column layout below rather than a hardcoded per-type list.
         recipients = []
         spreadsheet_id = None
-        
+        sanity_headers: List[str] = []
+
         try:
-            groq_query = '*[_type == "inquiryRouting" && inquiryType == $inquiryType][0]{ recipients, "spreadsheetId": spreadsheet->spreadsheetId }'
+            groq_query = '*[_type == "inquiryRouting" && inquiryType == $inquiryType][0]{ recipients, "spreadsheetId": spreadsheet->spreadsheetId, "headers": spreadsheet->headers }'
             routing_rule = await sanity_service.query_sanity(groq_query, {"$inquiryType": request.inquiryType})
             if routing_rule:
                 recipients = routing_rule.get("recipients") or []
                 spreadsheet_id = routing_rule.get("spreadsheetId")
+                sanity_headers = routing_rule.get("headers") or []
         except Exception as query_err:
             print(f"WARNING: Failed to query Sanity for inquiry routing rule: {query_err}")
 
@@ -100,10 +203,11 @@ async def submit_inquiry(request: InquirySubmitRequest):
             slug = slug_map.get(request.inquiryType)
             if slug:
                 try:
-                    sheet_query = '*[_type == "googleSpreadsheet" && id.current == $slug][0]{ spreadsheetId }'
+                    sheet_query = '*[_type == "googleSpreadsheet" && id.current == $slug][0]{ spreadsheetId, headers }'
                     sheet_doc = await sanity_service.query_sanity(sheet_query, {"$slug": slug})
                     if sheet_doc:
                         spreadsheet_id = sheet_doc.get("spreadsheetId")
+                        sanity_headers = sheet_doc.get("headers") or []
                         print(f"INFO: Resolved fallback spreadsheet for '{request.inquiryType}' matching slug '{slug}': {spreadsheet_id}")
                 except Exception as fallback_err:
                     print(f"WARNING: Failed to query fallback googleSpreadsheet by slug: {fallback_err}")
@@ -179,31 +283,19 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     ]
                 elif inquiry_type == "Order Medicine":
                     # Column order matches the sheet's header hierarchy:
-                    # Patient Full Name, Upload Valid ID of the Patient, Contact Person's Full Name,
-                    # Relationship to Patient, Email Address, Phone Number, Age, Delivery Address,
-                    # Prescription Link, Credentials Confirmation, Privacy Policy Consent, Timestamp
-                    # When "contact same as patient" is checked, the form hides the contact fields
-                    # entirely, so fall back to the patient's own name / "Self" instead of blanks.
-                    # The frontend blocks submission unless the "information is authentic" checkbox
-                    # is checked and doesn't send it as a field, so "Confirmed" is always correct here
-                    # (same pattern as Partnership's consent column). Privacy Policy Consent is a
-                    # separate real checkbox the frontend does send, so its value is read as-is.
-                    same_as_patient = request.additionalData.get("contactSameAsPatient", False)
-                    contact_name = request.fullName if same_as_patient else request.additionalData.get("contactName", "")
-                    contact_relationship = "Self" if same_as_patient else request.additionalData.get("contactRelationship", "")
-                    privacy_policy_consent = "Yes" if request.additionalData.get("privacyPolicyConsent", False) else "No"
+                    # Full Name, Email Address, Phone Number, Age, Delivery Address,
+                    # Prescription Link, Credentials Confirmation, Timestamp
+                    # The frontend blocks submission unless the "information is authentic"
+                    # checkbox is checked and doesn't send it as a field, so "Confirmed" is
+                    # always correct here (same pattern as Partnership's consent column).
                     row = [
                         request.fullName,
-                        id_verification_link,
-                        contact_name,
-                        contact_relationship,
                         request.email,
                         request.phone,
                         request.additionalData.get("age", ""),
                         request.additionalData.get("address", ""),
-                        ", ".join(prescription_links),
+                        ", ".join(file_links),
                         "Confirmed",
-                        privacy_policy_consent,
                         timestamp_str
                     ]
                 elif inquiry_type == "Partnership":
@@ -221,16 +313,8 @@ async def submit_inquiry(request: InquirySubmitRequest):
                         timestamp_str
                     ]
                 else:
-                    row = [
-                        timestamp_str,
-                        request.fullName,
-                        request.email,
-                        request.phone,
-                        request.message,
-                        ", ".join(file_links)
-                    ]
+                    sheet_headers = FALLBACK_HEADERS
 
-                # Update Headers if the Spreadsheet is Empty
                 if not values:
                     headers = []
                     if inquiry_type == "Career Inquiry":
@@ -240,7 +324,7 @@ async def submit_inquiry(request: InquirySubmitRequest):
                     elif inquiry_type == "Product Inquiry":
                         headers = ['Full Name', 'Phone Number', 'Email Address', 'Message', 'Product', 'Message', 'Prescription Link', 'Timestamp']
                     elif inquiry_type == "Order Medicine":
-                        headers = ['Patient Full Name', 'Upload Valid ID of the Patient', "Contact Person's Full Name", 'Relationship to Patient', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Privacy Policy Consent', 'Timestamp']
+                        headers = ['Full Name', 'Email Address', 'Phone Number', 'Age', 'Delivery Address', 'Prescription Link', 'Credentials Confirmation', 'Timestamp']
                     elif inquiry_type == "Partnership":
                         headers = ['Name', 'Company/Organization', 'Email', 'Mobile Number', 'Inquiry', 'Data Privacy Agreement', 'Timestamp']
                     else:
@@ -251,10 +335,12 @@ async def submit_inquiry(request: InquirySubmitRequest):
                             spreadsheetId=clean_id,
                             range='Sheet1!A1',
                             valueInputOption='RAW',
-                            body={'values': [headers]}
+                            body={'values': [sheet_headers]}
                         ).execute()
                     except Exception as update_err:
                         print(f"ERROR: Failed to update headers: {update_err}")
+
+                row = build_row_from_headers(sheet_headers, request, file_links_by_category, timestamp_str)
 
                 # Append Row
                 sheets.spreadsheets().values().append(

@@ -5,7 +5,6 @@ class FilePayload(BaseModel):
     name: str
     type: str
     base64: str
-    category: Optional[str] = None
 
 class InquirySubmitRequest(BaseModel):
     inquiryType: str  # Career Inquiry, Contact Us, Product Inquiry, Order Medicine, Partnership
