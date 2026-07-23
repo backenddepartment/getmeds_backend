@@ -75,8 +75,14 @@ def parse_wp_post(item: dict) -> dict:
     description = description.replace("&amp;nbsp;", " ").replace("&nbsp;", " ")
     description = re.sub(r'&#\d+;', '', description).strip()
     
-    # Read time parsing (approx 200 words per minute)
+    # Strip WordPress's "Easy Table of Contents" block — the frontend renders
+    # its own TOC from the post's headings, and the plugin's per-post
+    # "disable auto-insertion" setting isn't respected when WP builds the
+    # REST API's content.rendered field (only in the classic template loop).
     raw_content = item.get("content", {}).get("rendered", "")
+    raw_content = re.sub(r'<div id="ez-toc-container".*?</nav>\s*</div>', '', raw_content, flags=re.DOTALL)
+
+    # Read time parsing (approx 200 words per minute)
     text_only = re.sub(r'<[^>]*>', '', raw_content)
     word_count = len(text_only.split())
     minutes = max(1, round(word_count / 200))
