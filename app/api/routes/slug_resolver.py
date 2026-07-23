@@ -123,13 +123,16 @@ async def get_blog_posts(
     response: Response,
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
-    slug: str = Query(default=None)
+    slug: str = Query(default=None),
+    preview: bool = Query(default=False),
+    status: str = Query(default=None)
 ):
     cache_key = f"posts_page_{page}_per_{per_page}_slug_{slug}"
-    cached = _blog_cache.get(cache_key)
-    if cached:
-        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
-        return cached
+    if not preview:
+        cached = _blog_cache.get(cache_key)
+        if cached:
+            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            return cached
 
     params = {"_embed": "true"}
     if slug:
@@ -137,6 +140,9 @@ async def get_blog_posts(
     else:
         params["page"] = page
         params["per_page"] = per_page
+
+    if preview:
+        params["status"] = status or "any"
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -154,32 +160,45 @@ async def get_blog_posts(
                 "totalPages": total_pages
             }
             
-            _blog_cache.set(cache_key, result)
-            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            if not preview:
+                _blog_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            else:
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+
             return result
     except Exception as e:
         print(f"Error fetching posts: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @router.get("/blog/posts/{post_id}")
-async def get_blog_post_by_id(post_id: int, response: Response):
+async def get_blog_post_by_id(post_id: int, response: Response, preview: bool = Query(default=False)):
     cache_key = f"post_id_{post_id}"
-    cached = _blog_cache.get(cache_key)
-    if cached:
-        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
-        return cached
+    if not preview:
+        cached = _blog_cache.get(cache_key)
+        if cached:
+            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            return cached
+
+    params = {"_embed": "true"}
+    if preview:
+        params["status"] = "any"
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            wp_res = await client.get(f"{WP_API_BASE}/posts/{post_id}", params={"_embed": "true"})
+            wp_res = await client.get(f"{WP_API_BASE}/posts/{post_id}", params=params)
             if wp_res.status_code != 200:
                 return JSONResponse(status_code=wp_res.status_code, content={"error": "Failed to fetch from WordPress"})
             
             item = wp_res.json()
             parsed_item = parse_wp_post(item)
             
-            _blog_cache.set(cache_key, parsed_item)
-            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            if not preview:
+                _blog_cache.set(cache_key, parsed_item)
+                response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            else:
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+
             return parsed_item
     except Exception as e:
         print(f"Error fetching post by ID {post_id}: {e}")
