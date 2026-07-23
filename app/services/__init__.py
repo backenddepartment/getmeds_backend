@@ -14,9 +14,6 @@ class SanityService:
         self.headers = {}
         if settings.SANITY_TOKEN:
             self.headers["Authorization"] = f"Bearer {settings.SANITY_TOKEN}"
-            print(f"DEBUG: Sanity token loaded (starts with {settings.SANITY_TOKEN[:5]}...) for dataset '{ds}'")
-        else:
-            print("WARNING: No Sanity token found in environment!")
 
     _client = None
 
@@ -191,7 +188,6 @@ class SanityService:
 
         # 3. Handle Compression if limit reached
         if msg_count >= settings.CHAT_HISTORY_LIMIT:
-            print(f"DEBUG: Session {session_id} reached limit ({msg_count}). Compressing...")
             old_messages = session.get("messages", [])
             old_summary = session.get("summary") or ""
             
