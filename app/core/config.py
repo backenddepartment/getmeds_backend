@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     SECONDARY: str = "trained_assistant"
     TERTIARY: str = "groq_ai"
 
+    # WordPress Configuration — Application Password used only for preview requests
+    # (draft/private posts require authenticated `edit_posts` access to WP's REST API).
+    # Generate under WP Admin -> Users -> Profile -> Application Passwords.
+    WP_PREVIEW_USER: str = ""
+    WP_PREVIEW_APP_PASSWORD: str = ""
+
     # SMTP Configuration
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

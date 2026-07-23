@@ -5,7 +5,17 @@ import httpx
 from fastapi import APIRouter, Query, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 
+from app.core.config import settings
+
 router = APIRouter()
+
+def wp_preview_auth():
+    # WordPress rejects/filters non-public post statuses (draft, pending, private,
+    # future) for unauthenticated requests, even when status=any is requested.
+    # An Application Password with edit_posts capability is required to see them.
+    if settings.WP_PREVIEW_USER and settings.WP_PREVIEW_APP_PASSWORD:
+        return httpx.BasicAuth(settings.WP_PREVIEW_USER, settings.WP_PREVIEW_APP_PASSWORD)
+    return None
 
 class BoundedCache:
     def __init__(self, maxsize=1000, ttl=3600):
@@ -145,11 +155,11 @@ async def get_blog_posts(
         params["status"] = status or "any"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, auth=wp_preview_auth() if preview else None) as client:
             wp_res = await client.get(f"{WP_API_BASE}/posts", params=params)
             if wp_res.status_code != 200:
                 return JSONResponse(status_code=wp_res.status_code, content={"error": "Failed to fetch from WordPress"})
-            
+
             data = wp_res.json()
             total_pages = int(wp_res.headers.get("X-WP-TotalPages", 1))
             
@@ -185,7 +195,7 @@ async def get_blog_post_by_id(post_id: int, response: Response, preview: bool = 
         params["status"] = "any"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, auth=wp_preview_auth() if preview else None) as client:
             wp_res = await client.get(f"{WP_API_BASE}/posts/{post_id}", params=params)
             if wp_res.status_code != 200:
                 return JSONResponse(status_code=wp_res.status_code, content={"error": "Failed to fetch from WordPress"})
