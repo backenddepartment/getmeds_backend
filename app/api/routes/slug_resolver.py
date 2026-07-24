@@ -5,7 +5,17 @@ import httpx
 from fastapi import APIRouter, Query, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 
+from app.core.config import settings
+
 router = APIRouter()
+
+def wp_preview_auth():
+    # WordPress rejects/filters non-public post statuses (draft, pending, private,
+    # future) for unauthenticated requests, even when status=any is requested.
+    # An Application Password with edit_posts capability is required to see them.
+    if settings.WP_PREVIEW_USER and settings.WP_PREVIEW_APP_PASSWORD:
+        return httpx.BasicAuth(settings.WP_PREVIEW_USER, settings.WP_PREVIEW_APP_PASSWORD)
+    return None
 
 class BoundedCache:
     def __init__(self, maxsize=1000, ttl=3600):
@@ -65,8 +75,14 @@ def parse_wp_post(item: dict) -> dict:
     description = description.replace("&amp;nbsp;", " ").replace("&nbsp;", " ")
     description = re.sub(r'&#\d+;', '', description).strip()
     
-    # Read time parsing (approx 200 words per minute)
+    # Strip WordPress's "Easy Table of Contents" block — the frontend renders
+    # its own TOC from the post's headings, and the plugin's per-post
+    # "disable auto-insertion" setting isn't respected when WP builds the
+    # REST API's content.rendered field (only in the classic template loop).
     raw_content = item.get("content", {}).get("rendered", "")
+    raw_content = re.sub(r'<div id="ez-toc-container".*?</nav>\s*</div>', '', raw_content, flags=re.DOTALL)
+
+    # Read time parsing (approx 200 words per minute)
     text_only = re.sub(r'<[^>]*>', '', raw_content)
     word_count = len(text_only.split())
     minutes = max(1, round(word_count / 200))
@@ -123,13 +139,16 @@ async def get_blog_posts(
     response: Response,
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=20, ge=1, le=100),
-    slug: str = Query(default=None)
+    slug: str = Query(default=None),
+    preview: bool = Query(default=False),
+    status: str = Query(default=None)
 ):
     cache_key = f"posts_page_{page}_per_{per_page}_slug_{slug}"
-    cached = _blog_cache.get(cache_key)
-    if cached:
-        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
-        return cached
+    if not preview:
+        cached = _blog_cache.get(cache_key)
+        if cached:
+            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            return cached
 
     params = {"_embed": "true"}
     if slug:
@@ -138,12 +157,15 @@ async def get_blog_posts(
         params["page"] = page
         params["per_page"] = per_page
 
+    if preview:
+        params["status"] = status or "any"
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, auth=wp_preview_auth() if preview else None) as client:
             wp_res = await client.get(f"{WP_API_BASE}/posts", params=params)
             if wp_res.status_code != 200:
                 return JSONResponse(status_code=wp_res.status_code, content={"error": "Failed to fetch from WordPress"})
-            
+
             data = wp_res.json()
             total_pages = int(wp_res.headers.get("X-WP-TotalPages", 1))
             
@@ -154,32 +176,45 @@ async def get_blog_posts(
                 "totalPages": total_pages
             }
             
-            _blog_cache.set(cache_key, result)
-            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            if not preview:
+                _blog_cache.set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            else:
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+
             return result
     except Exception as e:
         print(f"Error fetching posts: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @router.get("/blog/posts/{post_id}")
-async def get_blog_post_by_id(post_id: int, response: Response):
+async def get_blog_post_by_id(post_id: int, response: Response, preview: bool = Query(default=False)):
     cache_key = f"post_id_{post_id}"
-    cached = _blog_cache.get(cache_key)
-    if cached:
-        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
-        return cached
+    if not preview:
+        cached = _blog_cache.get(cache_key)
+        if cached:
+            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            return cached
+
+    params = {"_embed": "true"}
+    if preview:
+        params["status"] = "any"
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            wp_res = await client.get(f"{WP_API_BASE}/posts/{post_id}", params={"_embed": "true"})
+        async with httpx.AsyncClient(timeout=15.0, auth=wp_preview_auth() if preview else None) as client:
+            wp_res = await client.get(f"{WP_API_BASE}/posts/{post_id}", params=params)
             if wp_res.status_code != 200:
                 return JSONResponse(status_code=wp_res.status_code, content={"error": "Failed to fetch from WordPress"})
             
             item = wp_res.json()
             parsed_item = parse_wp_post(item)
             
-            _blog_cache.set(cache_key, parsed_item)
-            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            if not preview:
+                _blog_cache.set(cache_key, parsed_item)
+                response.headers["Cache-Control"] = "public, max-age=60, s-maxage=3600, stale-while-revalidate=600"
+            else:
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+
             return parsed_item
     except Exception as e:
         print(f"Error fetching post by ID {post_id}: {e}")
